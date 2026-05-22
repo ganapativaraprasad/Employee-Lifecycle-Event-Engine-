@@ -13,6 +13,7 @@ class EmployeeCreateSchema(BaseModel):
 
 
 class EmployeeResponseSchema(BaseModel):
+
     id: str
     employee_code: str
     first_name: str
@@ -21,3 +22,15 @@ class EmployeeResponseSchema(BaseModel):
     department: str
     designation: str
     current_state: EmployeeState
+
+    class Config:
+        from_attributes = True
+
+from typing import Optional
+
+class EmployeeUpdateSchema(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    department: Optional[str] = None
+    designation: Optional[str] = None
