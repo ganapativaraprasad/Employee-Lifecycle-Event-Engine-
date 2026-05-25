@@ -10,7 +10,7 @@ from typing import Optional
 
 import os
 import shutil
-
+from fastapi.responses import FileResponse
 from app.models.employee_model import Employee
 from app.models.user_model import User
 
@@ -39,7 +39,7 @@ from app.services.employee_service import (
 from fastapi import BackgroundTasks
 
 from app.services.notification_service import (
-    send_welcome_email
+    send_status_change_email
 )
 
 router = APIRouter(
@@ -148,6 +148,7 @@ async def get_all_employees(
         )
 
     return response
+
 
 
 @router.get("/{employee_id}")
@@ -274,6 +275,40 @@ async def upload_employee_document(
             detail="Employee not found"
         )
 
+    allowed_extensions = [
+        ".pdf",
+        ".docx",
+        ".png",
+        ".jpg",
+        ".jpeg"
+    ]
+
+    file_extension = os.path.splitext(
+        file.filename
+    )[1].lower()
+
+    if file_extension not in allowed_extensions:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid file type"
+        )
+
+    file_size = 0
+
+    contents = await file.read()
+
+    file_size = len(contents)
+
+    max_size = 5 * 1024 * 1024
+
+    if file_size > max_size:
+
+        raise HTTPException(
+            status_code=400,
+            detail="File size exceeds 5MB limit"
+        )
+
     upload_dir = "uploads"
 
     os.makedirs(
@@ -284,10 +319,7 @@ async def upload_employee_document(
     file_path = f"{upload_dir}/{file.filename}"
 
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(
-            file.file,
-            buffer
-        )
+        buffer.write(contents)
 
     employee.documents.append(file_path)
 
@@ -297,3 +329,23 @@ async def upload_employee_document(
         "message": "File uploaded successfully",
         "file_path": file_path
     }
+
+@router.get("/download/{file_name}")
+async def download_employee_document(
+    file_name: str
+):
+
+    file_path = f"uploads/{file_name}"
+
+    if not os.path.exists(file_path):
+
+        raise HTTPException(
+            status_code=404,
+            detail="File not found"
+        )
+
+    return FileResponse(
+        path=file_path,
+        filename=file_name,
+        media_type="application/octet-stream"
+    )

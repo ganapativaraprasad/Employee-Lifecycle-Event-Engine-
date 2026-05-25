@@ -102,10 +102,17 @@ async def login_user(
     )
 
     return {
-        "access_token": access_token,
-        "refresh_token": refresh_token,
-        "token_type": "bearer"
+    "access_token": access_token,
+    "refresh_token": refresh_token,
+    "token_type": "bearer",
+
+    "user": {
+        "id": str(user.id),
+        "username": user.username,
+        "email": user.email,
+        "role": user.role
     }
+}
 
 
 @router.post("/refresh")
