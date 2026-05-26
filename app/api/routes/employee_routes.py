@@ -6,6 +6,7 @@ from fastapi import (
     File
 )
 
+from datetime import datetime
 from typing import Optional
 
 import os
@@ -17,7 +18,8 @@ from app.models.user_model import User
 from app.schemas.employee_schema import (
     EmployeeCreateSchema,
     EmployeeUpdateSchema,
-    EmployeeResponseSchema
+    EmployeeResponseSchema,
+    EmployeeListResponseSchema
 )
 
 from app.schemas.transition_schema import (
@@ -26,6 +28,9 @@ from app.schemas.transition_schema import (
 
 from app.core.enums.user_role import (
     UserRole
+)
+from app.core.enums.employee_state import (
+    EmployeeState
 )
 
 from app.core.dependencies import (
@@ -71,7 +76,7 @@ async def create_employee(
 
 @router.get(
     "/",
-    response_model=list[EmployeeResponseSchema]
+    response_model=EmployeeListResponseSchema
 )
 async def get_all_employees(
 
@@ -80,9 +85,34 @@ async def get_all_employees(
 
     search: Optional[str] = None,
 
+    employee_code: Optional[str] = None,
+
+    name: Optional[str] = None,
+
     department: Optional[str] = None,
 
-    current_state: Optional[str] = None
+    designation: Optional[str] = None,
+
+    current_state: Optional[str] = None,
+
+    employment_status: Optional[str] = None,
+
+    leave_status: Optional[str] = None,
+
+    joined_from: Optional[datetime] = None,
+
+    joined_to: Optional[datetime] = None,
+
+    sort_by: Optional[str] = "created_at",
+
+    sort_order: Optional[str] = "desc",
+
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
 ):
 
     skip = (page - 1) * limit
@@ -92,38 +122,100 @@ async def get_all_employees(
     if department:
         filters["department"] = department
 
+    if designation:
+        filters["designation"] = designation
+
     if current_state:
         filters["current_state"] = current_state
+    elif employment_status:
+        filters["current_state"] = employment_status
+
+    if not current_state:
+
+        if leave_status == "ON_LEAVE":
+            filters["current_state"] = EmployeeState.ON_LEAVE
+
+        elif leave_status == "NOT_ON_LEAVE":
+            filters["current_state"] = {
+                "$ne": EmployeeState.ON_LEAVE
+            }
 
     filters["is_deleted"] = False
 
+    if joined_from or joined_to:
+        date_filter = {}
+        if joined_from:
+            date_filter["$gte"] = joined_from
+        if joined_to:
+            date_filter["$lte"] = joined_to
+        filters["created_at"] = date_filter
+
+    if employee_code:
+        filters["employee_code"] = {
+            "$regex": employee_code,
+            "$options": "i"
+        }
+
     query = Employee.find(filters)
 
-    if search:
+    if search or name:
+        search_value = name or search
         query = query.find(
             {
                 "$or": [
                     {
                         "first_name": {
-                            "$regex": search,
+                            "$regex": search_value,
                             "$options": "i"
                         }
                     },
                     {
                         "last_name": {
-                            "$regex": search,
+                            "$regex": search_value,
+                            "$options": "i"
+                        }
+                    },
+                    {
+                        "email": {
+                            "$regex": search_value,
                             "$options": "i"
                         }
                     },
                     {
                         "employee_code": {
-                            "$regex": search,
+                            "$regex": search_value,
                             "$options": "i"
                         }
                     }
                 ]
             }
         )
+
+    sortable_fields = {
+        "employee_code",
+        "first_name",
+        "last_name",
+        "department",
+        "designation",
+        "current_state",
+        "created_at"
+    }
+
+    sort_field = "created_at"
+
+    if sort_by in sortable_fields:
+        sort_field = sort_by
+
+    sort_direction = -1
+
+    if sort_order == "asc":
+        sort_direction = 1
+
+    total = await query.count()
+
+    query = query.sort(
+        (sort_field, sort_direction)
+    )
 
     employees = await query \
         .skip(skip) \
@@ -143,16 +235,30 @@ async def get_all_employees(
                 email=employee.email,
                 department=employee.department,
                 designation=employee.designation,
-                current_state=employee.current_state
+                current_state=employee.current_state,
+                created_at=employee.created_at
             )
         )
 
-    return response
+    return EmployeeListResponseSchema(
+        items=response,
+        total=total,
+        page=page,
+        limit=limit
+    )
 
 
 
 @router.get("/{employee_id}")
-async def get_employee_by_id(employee_id: str):
+async def get_employee_by_id(
+    employee_id: str,
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
+):
 
     employee = await Employee.get(employee_id)
 
@@ -170,14 +276,21 @@ async def get_employee_by_id(employee_id: str):
         email=employee.email,
         department=employee.department,
         designation=employee.designation,
-        current_state=employee.current_state
+        current_state=employee.current_state,
+        created_at=employee.created_at
     )
 
 
 @router.put("/{employee_id}")
 async def update_employee(
     employee_id: str,
-    employee_data: EmployeeUpdateSchema
+    employee_data: EmployeeUpdateSchema,
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
 ):
 
     employee = await Employee.get(employee_id)
@@ -203,7 +316,12 @@ async def update_employee(
 
 
 @router.delete("/{employee_id}")
-async def delete_employee(employee_id: str):
+async def delete_employee(
+    employee_id: str,
+    current_user: User = Depends(
+        require_roles([UserRole.ADMIN])
+    )
+):
 
     employee = await Employee.get(employee_id)
 
@@ -264,7 +382,13 @@ async def transition_employee(
 @router.post("/{employee_id}/upload")
 async def upload_employee_document(
     employee_id: str,
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
 ):
 
     employee = await Employee.get(employee_id)
@@ -332,7 +456,13 @@ async def upload_employee_document(
 
 @router.get("/download/{file_name}")
 async def download_employee_document(
-    file_name: str
+    file_name: str,
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
 ):
 
     file_path = f"uploads/{file_name}"

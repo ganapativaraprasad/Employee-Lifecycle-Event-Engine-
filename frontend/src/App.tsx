@@ -5,12 +5,16 @@ import {
 } from "react-router-dom"
 
 import MainLayout from "./layouts/MainLayout"
+import ProtectedRoute from "./routes/ProtectedRoute"
 
 import DashboardPage from "./pages/DashboardPage"
 import EmployeesPage from "./pages/EmployeesPage"
+import LeavePage from "./pages/LeavePage"
+import CalendarPage from "./pages/CalendarPage"
 import LoginPage from "./pages/LoginPage"
-import OnboardingPage from "./pages/OnboardingPage"
-import RegisterPage from "./pages/RegisterPage"
+import UsersPage from "./pages/UsersPage"
+import ProfilePage from "./pages/ProfilePage"
+import ChangePasswordPage from "./pages/ChangePasswordPage"
 
 function App() {
 
@@ -29,11 +33,6 @@ function App() {
         <Route
           path="/"
           element={<LoginPage />}
-        />
-
-        <Route
-          path="/register"
-          element={<RegisterPage />}
         />
 
         <Route
@@ -60,22 +59,73 @@ function App() {
 
         <Route
           path="/dashboard"
-          element={<DashboardPage />}
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
         />
 
         <Route
           path="/employees"
-          element={<EmployeesPage />}
+          element={
+            <ProtectedRoute
+              allowedRoles={["ADMIN", "HR_MANAGER"]}
+            >
+              <EmployeesPage />
+            </ProtectedRoute>
+          }
         />
 
         <Route
-          path="/onboarding"
-          element={<OnboardingPage />}
+          path="/calendar"
+          element={
+            <ProtectedRoute
+              allowedRoles={["ADMIN", "HR_MANAGER", "EMPLOYEE"]}
+            >
+              <CalendarPage />
+            </ProtectedRoute>
+          }
         />
 
         <Route
-          path="/register"
-          element={<Navigate to="/dashboard" />}
+          path="/leaves"
+          element={
+            <ProtectedRoute
+              allowedRoles={["ADMIN", "HR_MANAGER", "EMPLOYEE"]}
+            >
+              <LeavePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <ProfilePage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/change-password"
+          element={
+            <ProtectedRoute>
+              <ChangePasswordPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/users"
+          element={
+            <ProtectedRoute
+              allowedRoles={["ADMIN", "HR_MANAGER"]}
+            >
+              <UsersPage />
+            </ProtectedRoute>
+          }
         />
 
         <Route

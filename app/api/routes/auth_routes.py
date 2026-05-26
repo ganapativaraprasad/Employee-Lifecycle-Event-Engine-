@@ -8,12 +8,7 @@ from jose import jwt, JWTError
 
 from app.models.user_model import User
 
-from app.schemas.auth_schema import (
-    UserRegisterSchema
-)
-
 from app.core.security import (
-    hash_password,
     verify_password,
     create_access_token,
     create_refresh_token,
@@ -29,39 +24,6 @@ router = APIRouter(
 )
 
 
-@router.post("/register")
-async def register_user(
-    user_data: UserRegisterSchema
-):
-
-    existing_user = await User.find_one(
-        User.email == user_data.email
-    )
-
-    if existing_user:
-        raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
-        )
-
-    hashed_password = hash_password(
-        user_data.password
-    )
-
-    user = User(
-        username=user_data.username,
-        email=user_data.email,
-        hashed_password=hashed_password,
-        role=user_data.role
-    )
-
-    await user.insert()
-
-    return {
-        "message": "User registered successfully"
-    }
-
-
 @router.post("/login")
 async def login_user(
     form_data: OAuth2PasswordRequestForm = Depends()
@@ -71,7 +33,7 @@ async def login_user(
         User.email == form_data.username
     )
 
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(
             status_code=401,
             detail="Invalid email or password"

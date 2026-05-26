@@ -1,8 +1,7 @@
 import { useState } from "react"
 
-import { Link } from "react-router-dom"
-
 import { loginUser } from "../services/authService"
+import InlineNotice from "../components/InlineNotice"
 
 function LoginPage() {
 
@@ -49,8 +48,6 @@ function LoginPage() {
         data.user.email
       )
 
-      alert("Login Successful 🚀")
-
       window.location.href = "/"
 
     } catch (error: any) {
@@ -69,7 +66,7 @@ function LoginPage() {
 
   return (
 
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-white to-indigo-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-blue-100 via-white to-indigo-100 px-4 animate-fade-in">
 
       <div className="bg-white p-10 rounded-3xl shadow-2xl w-full max-w-md">
 
@@ -83,13 +80,13 @@ function LoginPage() {
 
           </div>
 
-          <h1 className="text-5xl font-bold text-gray-800 mt-5">
+          <h1 className="text-4xl font-bold text-gray-800 mt-5">
 
             HRMS
 
           </h1>
 
-          <p className="text-gray-500 mt-3 text-lg">
+          <p className="text-gray-500 mt-3 text-base">
 
             Employee Lifecycle Engine
 
@@ -97,19 +94,7 @@ function LoginPage() {
 
         </div>
 
-        {/* Error */}
-
-        {
-
-          error && (
-
-            <div className="bg-red-100 text-red-600 p-4 rounded-xl mb-5 text-sm font-medium">
-
-              {error}
-
-            </div>
-          )
-        }
+        <InlineNotice message={error} variant="error" />
 
         {/* Email */}
 
@@ -128,7 +113,7 @@ function LoginPage() {
             onChange={(e) =>
               setEmail(e.target.value)
             }
-            className="w-full border border-gray-300 p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+            className="w-full border border-gray-300 p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-base"
           />
 
         </div>
@@ -150,7 +135,7 @@ function LoginPage() {
             onChange={(e) =>
               setPassword(e.target.value)
             }
-            className="w-full border border-gray-300 p-4 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-lg"
+            className="w-full border border-gray-300 p-3 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 text-base"
           />
 
         </div>
@@ -160,7 +145,7 @@ function LoginPage() {
         <button
           onClick={handleLogin}
           disabled={loading}
-          className="w-full bg-blue-600 text-white p-4 rounded-xl hover:bg-blue-700 transition text-lg font-semibold shadow-md disabled:bg-blue-300"
+          className="w-full bg-blue-600 text-white px-4 py-3 rounded-xl hover:bg-blue-700 transition text-base font-semibold shadow-md disabled:bg-blue-300"
         >
 
           {
@@ -171,27 +156,6 @@ function LoginPage() {
           }
 
         </button>
-
-        {/* Register */}
-
-        <div className="text-center mt-6">
-
-          <p className="text-gray-500">
-
-            Don't have an account?
-
-          </p>
-
-          <Link
-            to="/register"
-            className="text-blue-600 font-semibold hover:text-blue-700"
-          >
-
-            Register Here
-
-          </Link>
-
-        </div>
 
       </div>
 
