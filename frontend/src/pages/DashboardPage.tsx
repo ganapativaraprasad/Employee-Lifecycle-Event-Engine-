@@ -76,6 +76,35 @@ function DashboardPage() {
     )
   }
 
+  const departmentTotal =
+    stats.department_distribution.reduce(
+      (sum, item) => sum + item.count,
+      0
+    )
+
+  const pieColors = [
+    "#0ea5e9",
+    "#22c55e",
+    "#f59e0b",
+    "#ef4444",
+    "#8b5cf6",
+    "#14b8a6"
+  ]
+
+  const departmentChart = stats.department_distribution.map(
+    (item, index) => {
+      const percent = departmentTotal
+        ? (item.count / departmentTotal) * 100
+        : 0
+
+      return {
+        ...item,
+        percent,
+        color: pieColors[index % pieColors.length]
+      }
+    }
+  )
+
   return (
 
     <div>
@@ -240,57 +269,74 @@ function DashboardPage() {
 
             </div>
 
-            <div className="space-y-4">
+            {departmentChart.length === 0 && (
 
-              {stats.department_distribution.length === 0 && (
+              <div className="text-gray-500 text-sm">
 
-                <div className="text-gray-500 text-sm">
+                No department data yet.
 
-                  No department data yet.
+              </div>
+            )}
 
+            {departmentChart.length > 0 && (
+
+              <div className="flex flex-col md:flex-row md:items-center gap-6">
+
+                <div className="w-48 h-48">
+                  <svg viewBox="0 0 42 42" className="w-full h-full">
+                    {departmentChart.reduce(
+                      (segments, item, index) => {
+                        const previous = segments.total
+                        const strokeDasharray = `${item.percent} ${100 - item.percent}`
+                        const strokeDashoffset = 25 - previous
+
+                        segments.nodes.push(
+                          <circle
+                            key={item.department}
+                            r="15.9"
+                            cx="21"
+                            cy="21"
+                            fill="transparent"
+                            stroke={item.color}
+                            strokeWidth="8"
+                            strokeDasharray={strokeDasharray}
+                            strokeDashoffset={strokeDashoffset}
+                          />
+                        )
+
+                        segments.total += item.percent
+                        return segments
+                      },
+                      {
+                        total: 0,
+                        nodes: [] as JSX.Element[]
+                      }
+                    ).nodes}
+                  </svg>
                 </div>
-              )}
 
-              {stats.department_distribution.map((item) => {
-
-                const percent = stats.total_employees
-                  ? Math.round((item.count / stats.total_employees) * 100)
-                  : 0
-
-                return (
-
-                  <div key={item.department}>
-
-                    <div className="flex justify-between text-sm text-gray-600 mb-2">
-
+                <div className="flex-1 space-y-3">
+                  {departmentChart.map((item) => (
+                    <div
+                      key={item.department}
+                      className="flex items-center justify-between text-sm text-gray-600"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="inline-flex w-3 h-3 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        />
+                        <span>{item.department}</span>
+                      </div>
                       <span>
-
-                        {item.department}
-
+                        {item.count} ({Math.round(item.percent)}%)
                       </span>
-
-                      <span>
-
-                        {item.count} ({percent}%)
-
-                      </span>
-
                     </div>
+                  ))}
+                </div>
 
-                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-
-                      <div
-                        className="h-2 rounded-full bg-emerald-500"
-                        style={{ width: `${percent}%` }}
-                      />
-
-                    </div>
-
-                  </div>
-                )
-              })}
-
-            </div>
+              </div>
+            )}
 
           </div>
 

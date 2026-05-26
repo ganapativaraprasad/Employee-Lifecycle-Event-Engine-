@@ -13,175 +13,525 @@ type EventItem = {
 function CalendarPage() {
 
   const [events, setEvents] = useState<EventItem[]>([])
-  const [year, setYear] = useState<number>(new Date().getFullYear())
+
+  const [year, setYear] = useState<number>(
+    new Date().getFullYear()
+  )
 
   useEffect(() => {
+
     let mounted = true
-    const load = async () => {
+
+    const loadEvents = async () => {
+
       try {
-        const res = await getCalendarEvents(year)
+
+        const response =
+          await getCalendarEvents(year)
+
         if (!mounted) return
-        setEvents(res.events || [])
-      } catch (err) {
-        console.error(err)
+
+        setEvents(
+          response?.events || []
+        )
+
+      } catch (error: any) {
+
+        console.error(error)
       }
     }
-    load()
-    return () => { mounted = false }
-  }, [year])
 
-  // Map events to a lookup of yyyy-mm-dd -> array of events
-  const eventMap = useMemo(() => {
-    const map: Record<string, EventItem[]> = {}
+    loadEvents()
 
-    const addToMap = (dateStr: string, ev: EventItem) => {
-      if (!map[dateStr]) map[dateStr] = []
-      map[dateStr].push(ev)
+    return () => {
+
+      mounted = false
     }
 
-    events.forEach((ev) => {
-      try {
-        const s = new Date(ev.start_date)
-        const e = new Date(ev.end_date)
-        for (let d = new Date(s); d <= e; d.setDate(d.getDate() + 1)) {
-          const iso = d.toISOString().slice(0, 10)
-          addToMap(iso, ev)
+  }, [year])
+
+  const eventMap = useMemo(() => {
+
+    const map: Record<
+      string,
+      EventItem[]
+    > = {}
+
+    events.forEach((event) => {
+
+      const startDate =
+        new Date(event.start_date)
+
+      const endDate =
+        new Date(event.end_date)
+
+      const currentDate =
+        new Date(startDate)
+
+      while (
+        currentDate <= endDate
+      ) {
+
+        const isoDate =
+          currentDate
+            .toISOString()
+            .split("T")[0]
+
+        if (!map[isoDate]) {
+
+          map[isoDate] = []
         }
-      } catch (err) {
-        // ignore parse errors
+
+        map[isoDate].push(event)
+
+        currentDate.setDate(
+          currentDate.getDate() + 1
+        )
       }
     })
 
     return map
+
   }, [events])
 
-  const months = Array.from({ length: 12 }).map((_, i) => i)
+  const months =
+    Array.from(
+      { length: 12 },
+      (_, index) => index
+    )
 
-  const getDaysForMonth = (y: number, m: number) => {
-    const first = new Date(y, m, 1)
-    const last = new Date(y, m + 1, 0)
-    const days: Array<{ d: number; iso: string | null }> = []
-    const startWeek = first.getDay()
-    // fill blanks for week start
-    for (let i = 0; i < startWeek; i++) days.push({ d: 0, iso: null })
-    for (let day = 1; day <= last.getDate(); day++) {
-      const iso = new Date(y, m, day).toISOString().slice(0, 10)
-      days.push({ d: day, iso })
+  const getDaysForMonth = (
+    year: number,
+    month: number
+  ) => {
+
+    const firstDay =
+      new Date(year, month, 1)
+
+    const lastDay =
+      new Date(year, month + 1, 0)
+
+    const days: Array<{
+      day: number
+      iso: string | null
+    }> = []
+
+    const startWeekDay =
+      firstDay.getDay()
+
+    for (
+      let i = 0;
+      i < startWeekDay;
+      i++
+    ) {
+
+      days.push({
+        day: 0,
+        iso: null
+      })
     }
-    // pad to complete rows (optional)
-    while (days.length % 7 !== 0) days.push({ d: 0, iso: null })
+
+    for (
+      let day = 1;
+      day <= lastDay.getDate();
+      day++
+    ) {
+
+      const iso =
+        new Date(
+          year,
+          month,
+          day
+        )
+          .toISOString()
+          .split("T")[0]
+
+      days.push({
+        day,
+        iso
+      })
+    }
+
+    while (
+      days.length % 7 !== 0
+    ) {
+
+      days.push({
+        day: 0,
+        iso: null
+      })
+    }
+
     return days
   }
 
-  const statusColor = (status: string | undefined) => {
-    if (!status) return "bg-slate-200"
-    if (String(status).includes("APPROVED")) return "bg-blue-200"
-    if (String(status).includes("PENDING")) return "bg-amber-200"
-    if (String(status).includes("REJECTED")) return "bg-rose-200"
-    return "bg-slate-200"
+  const getStatusColor = (
+    status?: string
+  ) => {
+
+    if (!status)
+      return "bg-slate-100"
+
+    if (
+      status.includes(
+        "APPROVED"
+      )
+    ) {
+      return "bg-green-200"
+    }
+
+    if (
+      status.includes(
+        "PENDING"
+      )
+    ) {
+      return "bg-yellow-200"
+    }
+
+    if (
+      status.includes(
+        "REJECTED"
+      )
+    ) {
+      return "bg-red-200"
+    }
+
+    return "bg-blue-200"
   }
 
   return (
+
     <div>
 
-      <div className="rounded-2xl bg-white p-6 mb-6 flex items-center justify-between">
+      {/* Header */}
+
+      <div className="bg-white rounded-2xl shadow-sm p-6 mb-6 flex justify-between items-center">
+
         <div>
-          <h1 className="text-2xl font-semibold">Company Calendar {year}</h1>
-          <p className="text-sm text-slate-500 mt-1">Organization leave calendar (birthdays hidden)</p>
+
+          <h1 className="text-3xl font-bold">
+
+            Company Calendar {year}
+
+          </h1>
+
+          <p className="text-gray-500 mt-1">
+
+            Organization Leave Calendar
+
+          </p>
+
         </div>
 
         <div className="flex items-center gap-3">
+
           <button
-            onClick={() => setYear((y) => y - 1)}
-            className="px-3 py-2 border rounded-lg"
+            onClick={() =>
+              setYear(
+                (previous) =>
+                  previous - 1
+              )
+            }
+            className="px-4 py-2 border rounded-lg"
           >
-            ← {year - 1}
+
+            ← Previous
+
           </button>
 
           <select
             value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            className="px-3 py-2 border rounded-lg"
-          >
-            {Array.from({ length: 5 }).map((_, i) => {
-              const y = new Date().getFullYear() - 2 + i
-              return (
-                <option key={y} value={y}>{y}</option>
+            onChange={(e) =>
+              setYear(
+                Number(
+                  e.target.value
+                )
               )
-            })}
+            }
+            className="px-4 py-2 border rounded-lg"
+          >
+
+            {Array.from(
+              { length: 5 },
+              (_, index) => {
+
+                const currentYear =
+                  new Date()
+                    .getFullYear() -
+                  2 +
+                  index
+
+                return (
+
+                  <option
+                    key={currentYear}
+                    value={currentYear}
+                  >
+
+                    {currentYear}
+
+                  </option>
+                )
+              }
+            )}
+
           </select>
 
           <button
-            onClick={() => setYear((y) => y + 1)}
-            className="px-3 py-2 border rounded-lg"
+            onClick={() =>
+              setYear(
+                (previous) =>
+                  previous + 1
+              )
+            }
+            className="px-4 py-2 border rounded-lg"
           >
-            {year + 1} →
+
+            Next →
+
           </button>
+
         </div>
+
       </div>
+
+      {/* Calendar */}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {months.map((m) => {
-          const days = getDaysForMonth(year, m)
-          return (
-            <div key={m} className="bg-white rounded-2xl p-4 shadow-sm">
-              <div className="bg-gradient-to-r from-violet-500 to-indigo-500 text-white rounded-t-lg p-3 mb-3">
-                <h3 className="text-sm font-semibold">{new Date(year, m).toLocaleString(undefined, { month: 'long', year: 'numeric' })}</h3>
-              </div>
 
-              <div className="grid grid-cols-7 gap-1 text-xs mb-2">
-                {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
-                  <div key={d} className="text-center text-[10px] text-slate-500">{d}</div>
-                ))}
-              </div>
+        {months.map(
+          (month) => {
 
-              <div className="grid grid-cols-7 gap-1">
-                {days.map((cell, idx) => {
-                  const dayEvents = cell.iso ? eventMap[cell.iso] : undefined
-                  const bg = dayEvents && dayEvents.length > 0 ? statusColor(dayEvents[0].status) : 'bg-white'
-                  return (
-                    <div key={idx} className={`h-10 border rounded flex flex-col items-center justify-center ${bg}`}>
-                      {cell.d !== 0 ? (
-                        <>
-                          <div className="text-sm">{cell.d}</div>
-                          <div className="flex gap-1 mt-1">
-                            {dayEvents && dayEvents.slice(0,3).map((ev) => (
-                              <span key={ev.id} className="w-2 h-2 rounded-full bg-emerald-500" />
-                            ))}
-                          </div>
-                        </>
-                      ) : <div />}
-                    </div>
-                  )
-                })}
+            const days =
+              getDaysForMonth(
+                year,
+                month
+              )
+
+            return (
+
+              <div
+                key={month}
+                className="bg-white rounded-2xl shadow-sm p-4"
+              >
+
+                <div className="bg-gradient-to-r from-violet-500 to-indigo-500 text-white rounded-xl p-3 mb-3">
+
+                  <h3 className="font-semibold">
+
+                    {
+                      new Date(
+                        year,
+                        month
+                      ).toLocaleString(
+                        undefined,
+                        {
+                          month:
+                            "long",
+                          year:
+                            "numeric"
+                        }
+                      )
+                    }
+
+                  </h3>
+
+                </div>
+
+                <div className="grid grid-cols-7 gap-1 text-xs mb-2">
+
+                  {[
+                    "Sun",
+                    "Mon",
+                    "Tue",
+                    "Wed",
+                    "Thu",
+                    "Fri",
+                    "Sat"
+                  ].map(
+                    (dayName) => (
+
+                      <div
+                        key={dayName}
+                        className="text-center text-gray-500"
+                      >
+
+                        {dayName}
+
+                      </div>
+                    )
+                  )}
+
+                </div>
+
+                <div className="grid grid-cols-7 gap-1">
+
+                  {days.map(
+                    (
+                      cell,
+                      index
+                    ) => {
+
+                      const dayEvents =
+                        cell.iso
+                          ? eventMap[
+                              cell.iso
+                            ]
+                          : undefined
+
+                      const background =
+                        dayEvents &&
+                        dayEvents.length >
+                          0
+                          ? getStatusColor(
+                              dayEvents[0]
+                                .status
+                            )
+                          : "bg-white"
+
+                      return (
+
+                        <div
+                          key={index}
+                          className={`h-10 border rounded flex flex-col items-center justify-center ${background}`}
+                        >
+
+                          {cell.day !==
+                          0 ? (
+
+                            <>
+                              <span>
+
+                                {
+                                  cell.day
+                                }
+
+                              </span>
+
+                              <div className="flex gap-1 mt-1">
+
+                                {dayEvents
+                                  ?.slice(
+                                    0,
+                                    3
+                                  )
+                                  .map(
+                                    (
+                                      event
+                                    ) => (
+
+                                      <span
+                                        key={
+                                          event.id
+                                        }
+                                        className="w-2 h-2 rounded-full bg-emerald-500"
+                                      />
+                                    )
+                                  )}
+
+                              </div>
+                            </>
+
+                          ) : null}
+
+                        </div>
+                      )
+                    }
+                  )}
+
+                </div>
+
               </div>
-            </div>
-          )
-        })}
+            )
+          }
+        )}
+
       </div>
 
-      <div className="mt-6 bg-white rounded-2xl p-4 shadow-sm">
-        <h2 className="text-lg font-semibold mb-3">Leave Events</h2>
+      {/* Events */}
+
+      <div className="mt-6 bg-white rounded-2xl shadow-sm p-4">
+
+        <h2 className="text-xl font-semibold mb-4">
+
+          Leave Events
+
+        </h2>
+
         {events.length === 0 ? (
-          <div className="text-sm text-slate-500">No leave events found.</div>
+
+          <p className="text-gray-500">
+
+            No leave events found.
+
+          </p>
+
         ) : (
-          <div className="space-y-3 max-h-64 overflow-y-auto">
-            {events.map((ev) => (
-              <div key={ev.id} className="border rounded-lg p-3">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="font-medium">{ev.employee_name}</div>
-                    <div className="text-xs text-slate-500">{ev.start_date} → {ev.end_date}</div>
+
+          <div className="space-y-3 max-h-80 overflow-y-auto">
+
+            {events.map(
+              (event) => (
+
+                <div
+                  key={event.id}
+                  className="border rounded-lg p-3"
+                >
+
+                  <div className="flex justify-between">
+
+                    <div>
+
+                      <p className="font-medium">
+
+                        {
+                          event.employee_name
+                        }
+
+                      </p>
+
+                      <p className="text-sm text-gray-500">
+
+                        {
+                          event.start_date
+                        }
+                        {" → "}
+                        {
+                          event.end_date
+                        }
+
+                      </p>
+
+                    </div>
+
+                    <span className="text-sm text-gray-600">
+
+                      {
+                        event.status
+                      }
+
+                    </span>
+
                   </div>
-                  <div className="text-sm text-slate-600">{ev.status}</div>
+
+                  {event.reason && (
+
+                    <p className="text-sm text-gray-500 mt-2">
+
+                      {
+                        event.reason
+                      }
+
+                    </p>
+                  )}
+
                 </div>
-                {ev.reason && (
-                  <p className="text-xs text-slate-500 mt-2">{ev.reason}</p>
-                )}
-              </div>
-            ))}
+              )
+            )}
+
           </div>
         )}
+
       </div>
 
     </div>

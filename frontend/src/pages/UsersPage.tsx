@@ -4,6 +4,7 @@ import {
   createUser,
   listUsers
 } from "../services/userService"
+import { listEmployees } from "../services/employeeService"
 import InlineNotice from "../components/InlineNotice"
 
 type User = {
@@ -12,6 +13,11 @@ type User = {
   email: string
   role: string
   is_active: boolean
+}
+
+type Employee = {
+  id: string
+  email: string
 }
 
 const emptyForm = {
@@ -31,6 +37,9 @@ function UsersPage() {
 
   const [users, setUsers] =
     useState<User[]>([])
+
+  const [employees, setEmployees] =
+    useState<Employee[]>([])
 
   const [loading, setLoading] =
     useState(false)
@@ -84,11 +93,57 @@ function UsersPage() {
     }
   }
 
+  const loadEmployees = async () => {
+
+    if (!isAdmin) {
+      return
+    }
+
+    try {
+
+      const data = await listEmployees({
+        page: 1,
+        limit: 2000
+      })
+
+      setEmployees(data.items || [])
+
+    } catch (error) {
+
+      console.log(error)
+    }
+  }
+
   useEffect(() => {
 
     loadUsers()
+    loadEmployees()
 
   }, [isAdmin])
+
+  const visibleUsers = useMemo(() => {
+
+    if (!isAdmin) {
+      return [] as User[]
+    }
+
+    const employeeEmails = new Set(
+      employees.map((employee) =>
+        employee.email.toLowerCase()
+      )
+    )
+
+    return users.filter((user) => {
+      if (user.role !== "EMPLOYEE") {
+        return true
+      }
+
+      return employeeEmails.has(
+        user.email.toLowerCase()
+      )
+    })
+
+  }, [employees, isAdmin, users])
 
   const handleCreateUser = async () => {
 
@@ -286,7 +341,7 @@ function UsersPage() {
             </div>
           )}
 
-          {!loading && isAdmin && users.length === 0 && (
+          {!loading && isAdmin && visibleUsers.length === 0 && (
 
             <div className="text-gray-500 text-sm">
 
@@ -295,7 +350,7 @@ function UsersPage() {
             </div>
           )}
 
-          {!loading && isAdmin && users.length > 0 && (
+          {!loading && isAdmin && visibleUsers.length > 0 && (
 
             <div className="overflow-x-auto">
 
@@ -316,7 +371,7 @@ function UsersPage() {
 
                 <tbody>
 
-                  {users.map((user) => (
+                  {visibleUsers.map((user) => (
 
                     <tr key={user.id} className="border-b">
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
   FaEdit,
@@ -12,6 +12,7 @@ import {
   updateEmployee,
   updateEmployeeStatus
 } from "../services/employeeService"
+import { listLeaves } from "../services/leaveService"
 import InlineNotice from "../components/InlineNotice"
 
 type Employee = {
@@ -33,6 +34,14 @@ type EmployeeResponse = {
   limit: number
 }
 
+type LeaveItem = {
+  employee_id: string
+  employee_email: string
+  start_date: string
+  end_date: string
+  status: string
+}
+
 const defaultFilters = {
   search: "",
   employee_code: "",
@@ -52,6 +61,9 @@ function EmployeesPage() {
   const [employees, setEmployees] =
     useState<Employee[]>([])
 
+  const [allLeaves, setAllLeaves] =
+    useState<LeaveItem[]>([])
+
   const [total, setTotal] =
     useState(0)
 
@@ -59,7 +71,7 @@ function EmployeesPage() {
     useState(1)
 
   const [limit, setLimit] =
-    useState(10)
+    useState(1000)
 
   const [filters, setFilters] =
     useState(defaultFilters)
@@ -133,11 +145,61 @@ function EmployeesPage() {
     }
   }
 
+  const fetchAllLeaves = async () => {
+
+    if (role === "EMPLOYEE") {
+      return
+    }
+
+    try {
+
+      const data = await listLeaves({
+        page: 1,
+        limit: 2000
+      })
+
+      setAllLeaves(data.items || [])
+
+    } catch (error) {
+
+      console.log(error)
+    }
+  }
+
   useEffect(() => {
 
     fetchEmployees()
+    fetchAllLeaves()
 
   }, [page, limit, appliedFilters])
+
+  const onLeaveMap = useMemo(() => {
+    const map = new Set<string>()
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    allLeaves.forEach((leave) => {
+      if (leave.status !== "APPROVED") {
+        return
+      }
+
+      const start = new Date(leave.start_date)
+      const end = new Date(leave.end_date)
+      start.setHours(0, 0, 0, 0)
+      end.setHours(0, 0, 0, 0)
+
+      if (start <= today && end >= today) {
+        if (leave.employee_id) {
+          map.add(leave.employee_id)
+        }
+        if (leave.employee_email) {
+          map.add(leave.employee_email.toLowerCase())
+        }
+      }
+    })
+
+    return map
+  }, [allLeaves])
 
   const resetForm = () => {
 
@@ -590,6 +652,7 @@ function EmployeesPage() {
               className="border border-gray-300 p-2 rounded-lg"
             >
 
+              <option value={1000}>All</option>
               <option value={5}>5</option>
               <option value={10}>10</option>
               <option value={20}>20</option>
@@ -697,7 +760,20 @@ function EmployeesPage() {
               </tr>
             )}
 
-            {!loading && !error && employees.map((employee) => (
+            {!loading && !error && employees.map((employee) => {
+
+              const isOnLeave =
+                onLeaveMap.has(employee.id) ||
+                onLeaveMap.has(
+                  employee.email.toLowerCase()
+                )
+
+              const displayState =
+                isOnLeave
+                  ? "ON_LEAVE"
+                  : employee.current_state
+
+              return (
 
               <tr
                 key={employee.id}
@@ -751,26 +827,26 @@ function EmployeesPage() {
                     <span
                       className={`px-4 py-1 rounded-full text-sm font-semibold
 
-                      ${employee.current_state === "ACTIVE"
+                      ${displayState === "ACTIVE"
                         ? "bg-green-100 text-green-700"
 
-                        : employee.current_state === "OFFBOARDED"
+                        : displayState === "OFFBOARDED"
                         ? "bg-red-100 text-red-700"
 
-                        : employee.current_state === "SUSPENDED"
+                        : displayState === "SUSPENDED"
                         ? "bg-yellow-100 text-yellow-700"
 
-                        : employee.current_state === "ON_LEAVE"
+                        : displayState === "ON_LEAVE"
                         ? "bg-purple-100 text-purple-700"
 
-                        : employee.current_state === "TRANSFERRED"
+                        : displayState === "TRANSFERRED"
                         ? "bg-orange-100 text-orange-700"
 
                         : "bg-blue-100 text-blue-700"
                       }`}
                     >
 
-                      {employee.current_state}
+                      {displayState}
 
                     </span>
 
@@ -805,21 +881,21 @@ function EmployeesPage() {
                             Change Status
                           </option>
 
-                          {employee.current_state === "HIRED" && (
+                          {displayState === "HIRED" && (
 
                             <option value="ONBOARDING">
                               ONBOARDING
                             </option>
                           )}
 
-                          {employee.current_state === "ONBOARDING" && (
+                          {displayState === "ONBOARDING" && (
 
                             <option value="ACTIVE">
                               ACTIVE
                             </option>
                           )}
 
-                          {employee.current_state === "ACTIVE" && (
+                          {displayState === "ACTIVE" && (
 
                             <>
                               <option value="ON_LEAVE">
@@ -840,7 +916,7 @@ function EmployeesPage() {
                             </>
                           )}
 
-                          {employee.current_state === "ON_LEAVE" && (
+                          {displayState === "ON_LEAVE" && (
 
                             <>
                               <option value="ACTIVE">
@@ -853,14 +929,14 @@ function EmployeesPage() {
                             </>
                           )}
 
-                          {employee.current_state === "TRANSFERRED" && (
+                          {displayState === "TRANSFERRED" && (
 
                             <option value="ACTIVE">
                               ACTIVE
                             </option>
                           )}
 
-                          {employee.current_state === "SUSPENDED" && (
+                          {displayState === "SUSPENDED" && (
 
                             <>
                               <option value="ACTIVE">
@@ -873,7 +949,7 @@ function EmployeesPage() {
                             </>
                           )}
 
-                          {employee.current_state === "OFFBOARDED" && (
+                          {displayState === "OFFBOARDED" && (
 
                             <option value="ACTIVE">
                               ACTIVE
@@ -958,10 +1034,11 @@ function EmployeesPage() {
                     )
                   }
 
-                </td>
+                      </td>
 
-              </tr>
-            ))}
+                    </tr>
+                  )
+                })}
 
           </tbody>
 
