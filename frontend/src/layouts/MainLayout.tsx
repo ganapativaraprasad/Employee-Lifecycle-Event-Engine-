@@ -176,7 +176,9 @@ function MainLayout({
 
           </Link>
 
-          {(role === "ADMIN" || role === "HR_MANAGER") && (
+
+
+          {role === "ADMIN" && (
 
             <Link
               to="/users"
