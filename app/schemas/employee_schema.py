@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, EmailStr
 
 from app.core.enums.employee_state import EmployeeState
@@ -22,6 +24,7 @@ class EmployeeResponseSchema(BaseModel):
     department: str
     designation: str
     current_state: EmployeeState
+    created_at: datetime
 
     class Config:
         from_attributes = True
@@ -34,3 +37,10 @@ class EmployeeUpdateSchema(BaseModel):
     email: Optional[EmailStr] = None
     department: Optional[str] = None
     designation: Optional[str] = None
+
+
+class EmployeeListResponseSchema(BaseModel):
+    items: list[EmployeeResponseSchema]
+    total: int
+    page: int
+    limit: int

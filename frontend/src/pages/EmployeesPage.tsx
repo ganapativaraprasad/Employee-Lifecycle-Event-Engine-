@@ -12,13 +12,68 @@ import {
   updateEmployee,
   updateEmployeeStatus
 } from "../services/employeeService"
+import InlineNotice from "../components/InlineNotice"
+
+type Employee = {
+  id: string
+  employee_code: string
+  first_name: string
+  last_name: string
+  email: string
+  department: string
+  designation: string
+  current_state: string
+  created_at: string
+}
+
+type EmployeeResponse = {
+  items: Employee[]
+  total: number
+  page: number
+  limit: number
+}
+
+const defaultFilters = {
+  search: "",
+  employee_code: "",
+  department: "",
+  designation: "",
+  current_state: "",
+  employment_status: "",
+  leave_status: "",
+  joined_from: "",
+  joined_to: "",
+  sort_by: "created_at",
+  sort_order: "desc"
+}
 
 function EmployeesPage() {
 
   const [employees, setEmployees] =
-    useState<any[]>([])
+    useState<Employee[]>([])
 
-  const [search, setSearch] =
+  const [total, setTotal] =
+    useState(0)
+
+  const [page, setPage] =
+    useState(1)
+
+  const [limit, setLimit] =
+    useState(10)
+
+  const [filters, setFilters] =
+    useState(defaultFilters)
+
+  const [appliedFilters, setAppliedFilters] =
+    useState(defaultFilters)
+
+  const [loading, setLoading] =
+    useState(false)
+
+  const [error, setError] =
+    useState("")
+
+  const [success, setSuccess] =
     useState("")
 
   const [showModal, setShowModal] =
@@ -52,14 +107,29 @@ function EmployeesPage() {
 
     try {
 
-      const data =
-        await getEmployees()
+      setLoading(true)
+      setError("")
+      setSuccess("")
 
-      setEmployees(data)
+      const data: EmployeeResponse =
+        await getEmployees({
+          ...appliedFilters,
+          page,
+          limit
+        })
+
+      setEmployees(data.items)
+      setTotal(data.total)
 
     } catch (error) {
 
       console.log(error)
+
+      setError("Failed to load employees")
+
+    } finally {
+
+      setLoading(false)
     }
   }
 
@@ -67,7 +137,7 @@ function EmployeesPage() {
 
     fetchEmployees()
 
-  }, [])
+  }, [page, limit, appliedFilters])
 
   const resetForm = () => {
 
@@ -91,6 +161,9 @@ function EmployeesPage() {
 
       try {
 
+        setError("")
+        setSuccess("")
+
         await createEmployee(
           formData
         )
@@ -101,9 +174,13 @@ function EmployeesPage() {
 
         resetForm()
 
+        setSuccess("Employee created successfully")
+
       } catch (error) {
 
         console.log(error)
+
+        setError("Failed to create employee")
       }
     }
 
@@ -114,20 +191,27 @@ function EmployeesPage() {
 
       try {
 
+        setError("")
+        setSuccess("")
+
         await deleteEmployee(
           employeeId
         )
 
         await fetchEmployees()
 
+        setSuccess("Employee deleted successfully")
+
       } catch (error) {
 
         console.log(error)
+
+        setError("Failed to delete employee")
       }
     }
 
   const handleEditEmployee = (
-    employee: any
+    employee: Employee
   ) => {
 
     setIsEdit(true)
@@ -165,6 +249,9 @@ function EmployeesPage() {
 
       try {
 
+        setError("")
+        setSuccess("")
+
         await updateEmployee(
 
           selectedEmployeeId,
@@ -178,9 +265,13 @@ function EmployeesPage() {
 
         resetForm()
 
+        setSuccess("Employee updated successfully")
+
       } catch (error) {
 
         console.log(error)
+
+        setError("Failed to update employee")
       }
     }
 
@@ -192,6 +283,9 @@ function EmployeesPage() {
 
       try {
 
+        setError("")
+        setSuccess("")
+
         await updateEmployeeStatus(
           employeeId,
           status
@@ -199,60 +293,55 @@ function EmployeesPage() {
 
         await fetchEmployees()
 
+        setSuccess("Employee status updated")
+
       } catch (error) {
 
         console.log(error)
 
-        alert("Status update failed")
+        setError("Status update failed")
       }
     }
 
-  const filteredEmployees =
-    employees.filter((employee) => {
+  const applyFilters = () => {
 
-      const fullName =
+    setPage(1)
+    setAppliedFilters(filters)
+  }
 
-        `${employee.first_name}
-        ${employee.last_name}`
-          .toLowerCase()
+  const clearFilters = () => {
 
-      return (
+    setPage(1)
+    setFilters(defaultFilters)
+    setAppliedFilters(defaultFilters)
+  }
 
-        fullName.includes(
-          search.toLowerCase()
-        ) ||
+  const totalPages = Math.max(
+    1,
+    Math.ceil(total / limit)
+  )
 
-        employee.email
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          ) ||
+  const startIndex =
+    total === 0
+      ? 0
+      : (page - 1) * limit + 1
 
-        employee.department
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          ) ||
-
-        employee.employee_code
-          .toLowerCase()
-          .includes(
-            search.toLowerCase()
-          )
-      )
-    })
+  const endIndex = Math.min(
+    page * limit,
+    total
+  )
 
   return (
 
-    <div>
+    <div className="animate-fade-in">
 
       {/* HEADER */}
 
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8">
 
         <div>
 
-          <h1 className="text-4xl font-bold text-gray-800">
+          <h1 className="text-3xl font-bold text-gray-800">
 
             Employees
 
@@ -277,7 +366,7 @@ function EmployeesPage() {
 
                 setShowModal(true)
               }}
-              className="bg-blue-600 hover:bg-blue-700 transition text-white px-5 py-3 rounded-xl shadow-md"
+              className="bg-blue-600 hover:bg-blue-700 transition text-white text-sm px-4 py-2 rounded-lg shadow-md"
             >
 
               + Add Employee
@@ -288,19 +377,227 @@ function EmployeesPage() {
 
       </div>
 
-      {/* SEARCH */}
+      <InlineNotice message={error} variant="error" />
 
-      <div className="mb-6">
+      <InlineNotice message={success} variant="success" />
 
-        <input
-          type="text"
-          placeholder="Search employees..."
-          value={search}
-          onChange={(e) =>
-            setSearch(e.target.value)
-          }
-          className="w-full md:w-[400px] border border-gray-300 p-3 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
+      {/* FILTERS */}
+
+      <div className="bg-white rounded-2xl shadow-md p-6 mb-6">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+
+          <input
+            type="text"
+            placeholder="Search name, email, or code"
+            value={filters.search}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                search: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <input
+            type="text"
+            placeholder="Employee ID"
+            value={filters.employee_code}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                employee_code: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <input
+            type="text"
+            placeholder="Department"
+            value={filters.department}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                department: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <input
+            type="text"
+            placeholder="Designation"
+            value={filters.designation}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                designation: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <select
+            value={filters.employment_status}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                employment_status: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+
+            <option value="">Employment Status</option>
+
+            <option value="ACTIVE">Active</option>
+            <option value="SUSPENDED">Suspended</option>
+            <option value="OFFBOARDED">Offboarded</option>
+          </select>
+
+          <select
+            value={filters.current_state}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                current_state: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+
+            <option value="">FSM State</option>
+            <option value="HIRED">HIRED</option>
+            <option value="ONBOARDING">ONBOARDING</option>
+            <option value="ACTIVE">ACTIVE</option>
+            <option value="ON_LEAVE">ON_LEAVE</option>
+            <option value="TRANSFERRED">TRANSFERRED</option>
+            <option value="SUSPENDED">SUSPENDED</option>
+            <option value="OFFBOARDED">OFFBOARDED</option>
+          </select>
+
+          <select
+            value={filters.leave_status}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                leave_status: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+
+            <option value="">Leave Status</option>
+            <option value="ON_LEAVE">On Leave</option>
+            <option value="NOT_ON_LEAVE">Not On Leave</option>
+          </select>
+
+          <input
+            type="date"
+            value={filters.joined_from}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                joined_from: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <input
+            type="date"
+            value={filters.joined_to}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                joined_to: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+
+          <select
+            value={filters.sort_by}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                sort_by: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+
+            <option value="created_at">Sort by Joined</option>
+            <option value="employee_code">Sort by Employee ID</option>
+            <option value="first_name">Sort by First Name</option>
+            <option value="last_name">Sort by Last Name</option>
+            <option value="department">Sort by Department</option>
+            <option value="designation">Sort by Designation</option>
+          </select>
+
+          <select
+            value={filters.sort_order}
+            onChange={(e) =>
+              setFilters({
+                ...filters,
+                sort_order: e.target.value
+              })
+            }
+            className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+
+            <option value="desc">Newest First</option>
+            <option value="asc">Oldest First</option>
+          </select>
+
+        </div>
+
+        <div className="flex flex-wrap gap-3 mt-6">
+
+          <button
+            onClick={applyFilters}
+            className="bg-blue-600 hover:bg-blue-700 transition text-white text-sm px-4 py-2 rounded-lg shadow-md"
+          >
+
+            Apply Filters
+
+          </button>
+
+          <button
+            onClick={clearFilters}
+            className="bg-gray-100 hover:bg-gray-200 transition text-gray-700 text-sm px-4 py-2 rounded-lg"
+          >
+
+            Clear
+
+          </button>
+
+          <div className="ml-auto flex items-center gap-3">
+
+            <span className="text-sm text-gray-500">
+
+              Rows per page
+
+            </span>
+
+            <select
+              value={limit}
+              onChange={(e) =>
+                setLimit(Number(e.target.value))
+              }
+              className="border border-gray-300 p-2 rounded-lg"
+            >
+
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+            </select>
+
+          </div>
+
+        </div>
 
       </div>
 
@@ -331,6 +628,14 @@ function EmployeesPage() {
               </th>
 
               <th className="text-left p-4">
+                Designation
+              </th>
+
+              <th className="text-left p-4">
+                Joined
+              </th>
+
+              <th className="text-left p-4">
                 Status
               </th>
 
@@ -344,7 +649,55 @@ function EmployeesPage() {
 
           <tbody>
 
-            {filteredEmployees.map((employee) => (
+            {loading && (
+
+              <tr>
+
+                <td
+                  colSpan={8}
+                  className="p-6 text-center text-gray-500"
+                >
+
+                  Loading employees...
+
+                </td>
+
+              </tr>
+            )}
+
+            {!loading && error && (
+
+              <tr>
+
+                <td
+                  colSpan={8}
+                  className="p-6 text-center text-red-500"
+                >
+
+                  {error}
+
+                </td>
+
+              </tr>
+            )}
+
+            {!loading && !error && employees.length === 0 && (
+
+              <tr>
+
+                <td
+                  colSpan={8}
+                  className="p-6 text-center text-gray-500"
+                >
+
+                  No employees match your filters.
+
+                </td>
+
+              </tr>
+            )}
+
+            {!loading && !error && employees.map((employee) => (
 
               <tr
                 key={employee.id}
@@ -374,6 +727,18 @@ function EmployeesPage() {
                 <td className="p-4">
 
                   {employee.department}
+
+                </td>
+
+                <td className="p-4">
+
+                  {employee.designation}
+
+                </td>
+
+                <td className="p-4 text-gray-600">
+
+                  {new Date(employee.created_at).toLocaleDateString()}
 
                 </td>
 
@@ -427,21 +792,10 @@ function EmployeesPage() {
                             if (!selectedStatus)
                               return
 
-                            try {
-
-                              await handleStatusUpdate(
-                                employee.id,
-                                selectedStatus
-                              )
-
-                              await fetchEmployees()
-
-                            } catch (error) {
-
-                              console.log(error)
-
-                              alert("Status update failed")
-                            }
+                            await handleStatusUpdate(
+                              employee.id,
+                              selectedStatus
+                            )
                           }}
 
                           className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -615,6 +969,48 @@ function EmployeesPage() {
 
       </div>
 
+      {/* PAGINATION */}
+
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mt-6">
+
+        <div className="text-sm text-gray-500">
+
+          Showing {startIndex} - {endIndex} of {total}
+
+        </div>
+
+        <div className="flex items-center gap-2">
+
+          <button
+            onClick={() => setPage(Math.max(1, page - 1))}
+            disabled={page === 1}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 disabled:text-gray-400 disabled:border-gray-200"
+          >
+
+            Previous
+
+          </button>
+
+          <span className="text-sm text-gray-600">
+
+            Page {page} of {totalPages}
+
+          </span>
+
+          <button
+            onClick={() => setPage(Math.min(totalPages, page + 1))}
+            disabled={page === totalPages}
+            className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 disabled:text-gray-400 disabled:border-gray-200"
+          >
+
+            Next
+
+          </button>
+
+        </div>
+
+      </div>
+
       {/* MODAL */}
 
       {
@@ -623,7 +1019,7 @@ function EmployeesPage() {
 
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center">
 
-            <div className="bg-white w-[500px] rounded-2xl p-8 shadow-2xl">
+            <div className="bg-white w-125 rounded-2xl p-8 shadow-2xl">
 
               <h2 className="text-3xl font-bold mb-6">
 
@@ -730,7 +1126,7 @@ function EmployeesPage() {
 
                     resetForm()
                   }}
-                  className="px-5 py-3 rounded-xl bg-gray-200 hover:bg-gray-300"
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm"
                 >
 
                   Cancel
@@ -743,7 +1139,7 @@ function EmployeesPage() {
                     ? handleUpdateEmployee
                     : handleCreateEmployee
                   }
-                  className="px-5 py-3 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm"
                 >
 
                   {isEdit

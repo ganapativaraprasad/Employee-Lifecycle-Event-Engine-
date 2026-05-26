@@ -4,6 +4,7 @@ from app.core.database import db
 from app.models.employee_model import Employee
 from app.models.user_model import User
 from app.models.audit_log_model import AuditLog
+from app.models.leave_request_model import LeaveRequest
 from app.api.routes.employee_routes import (
     router as employee_router
 )
@@ -22,6 +23,12 @@ from app.exceptions.exception_handlers import (
 )
 from app.api.routes.dashboard_routes import (
     router as dashboard_router
+)
+from app.api.routes.user_routes import (
+    router as user_router
+)
+from app.api.routes.leave_routes import (
+    router as leave_router
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import WebSocket
@@ -65,7 +72,8 @@ async def app_init():
         document_models=[
             Employee,
             User,
-            AuditLog
+            AuditLog,
+            LeaveRequest
         ]
     )
 
@@ -85,6 +93,16 @@ async def root():
 
 app.include_router(
     auth_router,
+    prefix="/api/v1"
+)
+
+app.include_router(
+    user_router,
+    prefix="/api/v1"
+)
+
+app.include_router(
+    leave_router,
     prefix="/api/v1"
 )
 

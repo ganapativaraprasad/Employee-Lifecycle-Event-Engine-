@@ -1,7 +1,11 @@
+import { useState } from "react"
+
 import {
   FaTachometerAlt,
   FaUsers,
   FaUserPlus,
+  FaCalendarAlt,
+  FaUserCog,
   FaSignOutAlt,
   FaUserCircle
 } from "react-icons/fa"
@@ -22,6 +26,9 @@ function MainLayout({
   const location =
     useLocation()
 
+  const [menuOpen, setMenuOpen] =
+    useState(false)
+
   const logout = () => {
 
     localStorage.removeItem(
@@ -38,6 +45,16 @@ function MainLayout({
   const role =
     localStorage.getItem(
       "user_role"
+    )
+
+  const username =
+    localStorage.getItem(
+      "username"
+    )
+
+  const email =
+    localStorage.getItem(
+      "user_email"
     )
 
   const getRoleColor = () => {
@@ -57,7 +74,7 @@ function MainLayout({
 
       {/* SIDEBAR */}
 
-      <div className="w-[260px] bg-[#111827] text-white flex flex-col p-6 shadow-2xl">
+      <div className="w-55 bg-[#111827] text-white flex flex-col p-5 shadow-2xl">
 
         {/* LOGO */}
 
@@ -79,11 +96,11 @@ function MainLayout({
 
         {/* NAVIGATION */}
 
-        <nav className="flex flex-col gap-4">
+        <nav className="flex flex-col gap-3">
 
           <Link
             to="/dashboard"
-            className={`flex items-center gap-3 transition p-4 rounded-xl text-lg font-medium
+            className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
 
             ${location.pathname === "/dashboard"
 
@@ -99,11 +116,53 @@ function MainLayout({
 
           </Link>
 
-          <Link
-            to="/employees"
-            className={`flex items-center gap-3 transition p-4 rounded-xl text-lg font-medium
+          {role === "EMPLOYEE" ? (
 
-            ${location.pathname === "/employees"
+            <Link
+              to="/calendar"
+              className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
+
+              ${location.pathname === "/calendar"
+
+                ? "bg-blue-600"
+
+                : "hover:bg-gray-700"
+              }`}
+            >
+
+              <FaCalendarAlt />
+
+              Calendar
+
+            </Link>
+
+          ) : (
+
+            <Link
+              to="/employees"
+              className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
+
+              ${location.pathname === "/employees"
+
+                ? "bg-blue-600"
+
+                : "hover:bg-gray-700"
+              }`}
+            >
+
+              <FaUsers />
+
+              Employees
+
+            </Link>
+
+          )}
+
+          <Link
+            to="/leaves"
+            className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
+
+            ${location.pathname === "/leaves"
 
               ? "bg-blue-600"
 
@@ -111,48 +170,34 @@ function MainLayout({
             }`}
           >
 
-            <FaUsers />
+            <FaCalendarAlt />
 
-            Employees
-
-          </Link>
-
-          <Link
-            to="/onboarding"
-            className={`flex items-center gap-3 transition p-4 rounded-xl text-lg font-medium
-
-            ${location.pathname === "/onboarding"
-
-              ? "bg-blue-600"
-
-              : "hover:bg-gray-700"
-            }`}
-          >
-
-            <FaUserPlus />
-
-            Onboarding
+            Leave Management
 
           </Link>
+
+          {(role === "ADMIN" || role === "HR_MANAGER") && (
+
+            <Link
+              to="/users"
+              className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
+
+              ${location.pathname === "/users"
+
+                ? "bg-blue-600"
+
+                : "hover:bg-gray-700"
+              }`}
+            >
+
+              <FaUserCog />
+
+              User Management
+
+            </Link>
+          )}
 
         </nav>
-
-        {/* LOGOUT */}
-
-        <div className="mt-auto">
-
-          <button
-            onClick={logout}
-            className="flex items-center justify-center gap-3 bg-red-500 hover:bg-red-600 transition p-4 rounded-xl w-full text-lg font-medium shadow-md"
-          >
-
-            <FaSignOutAlt />
-
-            Logout
-
-          </button>
-
-        </div>
 
       </div>
 
@@ -162,7 +207,7 @@ function MainLayout({
 
         {/* TOP HEADER */}
 
-        <div className="bg-white shadow-sm px-8 py-4 flex justify-end items-center">
+        <div className="bg-white shadow-sm px-6 py-3 flex justify-end items-center">
 
           <div className="flex items-center gap-4">
 
@@ -188,9 +233,74 @@ function MainLayout({
 
             </div>
 
-            <div className="text-4xl text-gray-600">
+            <div className="relative">
 
-              <FaUserCircle />
+              <button
+                onClick={() =>
+                  setMenuOpen(!menuOpen)
+                }
+                className="flex items-center gap-3"
+              >
+
+                <div className="text-right hidden md:block">
+
+                  <p className="text-sm text-gray-500">
+
+                    {username || "User"}
+
+                  </p>
+
+                  <p className="text-xs text-gray-400">
+
+                    {email || ""}
+
+                  </p>
+
+                </div>
+
+                <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-600">
+
+                  <FaUserCircle />
+
+                </div>
+
+              </button>
+
+              {menuOpen && (
+
+                <div className="absolute right-0 mt-3 w-48 bg-white rounded-xl shadow-lg border border-gray-100 z-20">
+
+                  <Link
+                    to="/profile"
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                    onClick={() => setMenuOpen(false)}
+                  >
+
+                    View Profile
+
+                  </Link>
+
+                  <Link
+                    to="/change-password"
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"
+                    onClick={() => setMenuOpen(false)}
+                  >
+
+                    Change Password
+
+                  </Link>
+
+                  <button
+                    onClick={logout}
+                    className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50"
+                  >
+
+                    Logout
+
+                  </button>
+
+                </div>
+              )}
 
             </div>
 
