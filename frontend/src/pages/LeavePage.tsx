@@ -42,6 +42,8 @@ type Employee = {
   last_name: string
   email: string
   current_state: string
+  department?: string
+  designation?: string
 }
 
 type UserItem = {

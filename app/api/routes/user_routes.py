@@ -11,6 +11,10 @@ from app.schemas.user_schema import (
     UserResponseSchema,
     UserUpdateSchema
 )
+from app.schemas.user_schema import ForgotPasswordSchema, ResetPasswordSchema
+from datetime import datetime, timedelta
+import random
+from app.services.notification_service import send_password_reset_email
 
 router = APIRouter(
     prefix="/users",
@@ -190,3 +194,53 @@ async def admin_set_password(
     return {
         "message": "Password updated successfully"
     }
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordSchema
+):
+
+    user = await User.find_one(User.email == payload.email)
+
+    # Always return success to avoid user enumeration
+    if not user:
+        return {"message": "If the email exists, a reset code was sent."}
+
+    # generate 6-digit code
+    code = f"{random.randint(100000, 999999)}"
+    user.reset_code = code
+    user.reset_expires = datetime.utcnow() + timedelta(minutes=15)
+    await user.save()
+
+    # send email (may be skipped if SMTP not configured)
+    try:
+        await send_password_reset_email(user.email, code)
+    except Exception:
+        pass
+
+    return {"message": "If the email exists, a reset code was sent."}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordSchema
+):
+
+    user = await User.find_one(User.email == payload.email)
+
+    if not user or not getattr(user, 'reset_code', None):
+        raise HTTPException(status_code=400, detail="Invalid code or email")
+
+    if user.reset_code != payload.code:
+        raise HTTPException(status_code=400, detail="Invalid code or email")
+
+    if getattr(user, 'reset_expires', None) and datetime.utcnow() > user.reset_expires:
+        raise HTTPException(status_code=400, detail="Reset code expired")
+
+    user.hashed_password = hash_password(payload.new_password)
+    user.reset_code = None
+    user.reset_expires = None
+    await user.save()
+
+    return {"message": "Password has been reset successfully"}
