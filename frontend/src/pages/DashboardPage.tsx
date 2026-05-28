@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 import {
   getDashboardStats
 } from "../services/dashboardService"
+import { listMyLeaves } from "../services/leaveService"
 
 type DepartmentDistribution = {
   department: string
@@ -30,14 +31,40 @@ type DashboardStats = {
   recent_activities: RecentActivity[]
 }
 
+type LeaveItem = {
+  id: string
+  start_date: string
+  end_date: string
+  reason: string
+  leave_type?: string
+  status: string
+  decision_note?: string
+  created_at: string
+}
+
 function DashboardPage() {
 
   const [stats, setStats] =
     useState<DashboardStats | null>(null)
 
+  const [myLeaves, setMyLeaves] =
+    useState<LeaveItem[]>([])
+
+  const [myLeavesLoading, setMyLeavesLoading] =
+    useState(false)
+
   const role = localStorage.getItem(
     "user_role"
   )
+
+  const username =
+    localStorage.getItem(
+      "username"
+    )
+
+  const isRoleReady = Boolean(role)
+
+  const isEmployee = role === "EMPLOYEE"
 
   const showAdminHrView =
     role === "ADMIN" ||
@@ -58,29 +85,109 @@ function DashboardPage() {
     }
   }
 
-  useEffect(() => {
+  const fetchMyLeaves = async () => {
 
-    fetchStats()
+    if (!isEmployee) {
+      return
+    }
 
-  }, [])
+    try {
 
-  if (!stats) {
+      setMyLeavesLoading(true)
 
-    return (
+      const data = await listMyLeaves({
+        page: 1,
+        limit: 2000
+      })
 
-      <div className="text-2xl font-semibold">
+      setMyLeaves(data.items || [])
 
-        Loading Dashboard...
+    } catch (error) {
 
-      </div>
-    )
+      console.log(error)
+
+    } finally {
+
+      setMyLeavesLoading(false)
+    }
   }
 
-  const departmentTotal =
-    stats.department_distribution.reduce(
-      (sum, item) => sum + item.count,
+  useEffect(() => {
+
+    if (showAdminHrView) {
+      fetchStats()
+    }
+
+    if (isEmployee) {
+      fetchMyLeaves()
+    }
+
+  }, [isEmployee, showAdminHrView])
+
+  const isLoading =
+    (showAdminHrView && !stats) ||
+    (isEmployee && myLeavesLoading)
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const employeeSummary = useMemo(() => {
+    const approved = myLeaves.filter(
+      (leave) => leave.status === "APPROVED"
+    )
+
+    const pending = myLeaves.filter(
+      (leave) => leave.status === "PENDING"
+    )
+
+    const upcoming = approved
+      .filter((leave) => {
+        const start = new Date(leave.start_date)
+        start.setHours(0, 0, 0, 0)
+        return start >= today
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.start_date).getTime() -
+          new Date(b.start_date).getTime()
+      )
+
+    const totalApprovedDays = approved.reduce(
+      (sum, leave) => {
+        const start = new Date(leave.start_date)
+        const end = new Date(leave.end_date)
+        const days =
+          Math.ceil(
+            (end.getTime() - start.getTime()) /
+              (1000 * 60 * 60 * 24)
+          ) + 1
+        return sum + Math.max(days, 0)
+      },
       0
     )
+
+    const recent = [...myLeaves]
+      .sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() -
+          new Date(a.created_at).getTime()
+      )
+      .slice(0, 5)
+
+    return {
+      approved,
+      pending,
+      upcoming,
+      totalApprovedDays,
+      recent
+    }
+  }, [myLeaves])
+
+  const departmentTotal =
+    stats?.department_distribution.reduce(
+      (sum, item) => sum + item.count,
+      0
+    ) || 0
 
   const pieColors = [
     "#0ea5e9",
@@ -91,7 +198,7 @@ function DashboardPage() {
     "#14b8a6"
   ]
 
-  const departmentChart = stats.department_distribution.map(
+  const departmentChart = (stats?.department_distribution || []).map(
     (item, index) => {
       const percent = departmentTotal
         ? (item.count / departmentTotal) * 100
@@ -108,6 +215,241 @@ function DashboardPage() {
   return (
 
     <div>
+
+      {!isRoleReady && (
+
+        <div className="text-2xl font-semibold">
+
+          Loading Dashboard...
+
+        </div>
+      )}
+
+      {isLoading && (
+
+        <div className="text-2xl font-semibold">
+
+          Loading Dashboard...
+
+        </div>
+      )}
+
+      {!isLoading && isEmployee && (
+
+        <>
+
+          <div className="rounded-3xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-700 text-white p-8 mb-8">
+
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+
+              <div>
+
+                <p className="uppercase tracking-[0.25em] text-xs text-slate-300">
+
+                  My Workspace
+
+                </p>
+
+                <p className="text-sm text-slate-300 mt-2">
+
+                  Welcome, {username || "Employee"} ({role || "Employee"})
+
+                </p>
+
+                <h1 className="text-3xl md:text-4xl font-display mt-3">
+
+                  Employee Dashboard
+
+                </h1>
+
+                <p className="text-slate-300 mt-3 max-w-xl">
+
+                  Track your leave requests, approvals, and upcoming time off.
+
+                </p>
+
+              </div>
+
+              <div className="bg-white/10 rounded-2xl p-6 border border-white/10">
+
+                <p className="text-xs uppercase tracking-[0.2em] text-slate-300">
+
+                  Upcoming Leave
+
+                </p>
+
+                {employeeSummary.upcoming.length > 0 ? (
+
+                  <>
+
+                    <p className="text-2xl font-semibold mt-3">
+
+                      {employeeSummary.upcoming[0].start_date}
+
+                    </p>
+
+                    <p className="text-sm text-slate-300 mt-2">
+
+                      {employeeSummary.upcoming[0].leave_type || "SICK"}
+
+                    </p>
+
+                  </>
+
+                ) : (
+
+                  <p className="text-sm text-slate-300 mt-3">
+
+                    No upcoming leaves
+
+                  </p>
+                )}
+
+              </div>
+
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+
+              <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+                Pending Requests
+
+              </h2>
+
+              <p className="text-3xl font-semibold mt-3 text-amber-600">
+
+                {employeeSummary.pending.length}
+
+              </p>
+
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+
+              <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+                Approved Leaves
+
+              </h2>
+
+              <p className="text-3xl font-semibold mt-3 text-emerald-600">
+
+                {employeeSummary.approved.length}
+
+              </p>
+
+            </div>
+
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+
+              <h2 className="text-xs uppercase tracking-[0.2em] text-slate-400">
+
+                Approved Days
+
+              </h2>
+
+              <p className="text-3xl font-semibold mt-3 text-sky-600">
+
+                {employeeSummary.totalApprovedDays}
+
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 mt-8">
+
+            <div className="flex items-center justify-between mb-6">
+
+              <h2 className="text-xl font-semibold text-gray-800">
+
+                Recent Leave Requests
+
+              </h2>
+
+              <span className="text-sm text-slate-500">
+
+                Latest 5 requests
+
+              </span>
+
+            </div>
+
+            {employeeSummary.recent.length === 0 && (
+
+              <div className="text-gray-500 text-sm">
+
+                No leave requests yet.
+
+              </div>
+            )}
+
+            {employeeSummary.recent.length > 0 && (
+
+              <div className="space-y-4">
+
+                {employeeSummary.recent.map((leave) => (
+
+                  <div
+                    key={leave.id}
+                    className="border border-slate-100 rounded-xl p-4"
+                  >
+
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+
+                      <div>
+
+                        <p className="font-medium text-gray-800">
+
+                          {leave.start_date} to {leave.end_date}
+
+                        </p>
+
+                        <p className="text-sm text-slate-500">
+
+                          {leave.reason}
+
+                        </p>
+
+                      </div>
+
+                      <span className={`px-3 py-1 rounded-full text-xs font-semibold ${leave.status === "APPROVED" ? "bg-green-100 text-green-700" : leave.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+
+                        {leave.status}
+
+                      </span>
+
+                    </div>
+
+                    {leave.decision_note && (
+
+                      <p className="text-xs text-slate-500 mt-2">
+
+                        Decision: {leave.decision_note}
+
+                      </p>
+                    )}
+
+                  </div>
+                ))}
+
+              </div>
+            )}
+
+          </div>
+
+        </>
+      )}
+
+      {!isLoading && !isEmployee && stats && (
+
+      <>
 
       <div className="rounded-3xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-700 text-white p-8 mb-8">
 
@@ -476,6 +818,10 @@ function DashboardPage() {
           </div>
 
         </div>
+      )}
+
+      </>
+
       )}
 
     </div>

@@ -5,6 +5,8 @@ from app.models.employee_model import Employee
 from app.models.user_model import User
 from app.models.audit_log_model import AuditLog
 from app.models.leave_request_model import LeaveRequest
+from app.models.holiday_model import Holiday
+from app.models.calendar_event_model import CalendarEvent
 from app.api.routes.employee_routes import (
     router as employee_router
 )
@@ -29,6 +31,9 @@ from app.api.routes.user_routes import (
 )
 from app.api.routes.leave_routes import (
     router as leave_router
+)
+from app.api.routes.calendar_routes import (
+    router as calendar_router
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import WebSocket
@@ -73,7 +78,9 @@ async def app_init():
             Employee,
             User,
             AuditLog,
-            LeaveRequest
+            LeaveRequest,
+            Holiday,
+            CalendarEvent
         ]
     )
 
@@ -103,6 +110,11 @@ app.include_router(
 
 app.include_router(
     leave_router,
+    prefix="/api/v1"
+)
+
+app.include_router(
+    calendar_router,
     prefix="/api/v1"
 )
 

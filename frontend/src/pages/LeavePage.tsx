@@ -9,6 +9,7 @@ import {
   rejectLeave
 } from "../services/leaveService"
 import { listEmployees } from "../services/employeeService"
+import { listUsers } from "../services/userService"
 import InlineNotice from "../components/InlineNotice"
 
 type LeaveItem = {
@@ -43,11 +44,20 @@ type Employee = {
   current_state: string
 }
 
+type UserItem = {
+  id: string
+  email: string
+  role: string
+}
+
 function LeavePage() {
 
   const role = localStorage.getItem(
     "user_role"
   )
+
+  const userEmail =
+    (localStorage.getItem("user_email") || "").toLowerCase()
 
   const isAdmin = role === "ADMIN"
   const isHr = role === "HR_MANAGER"
@@ -58,6 +68,8 @@ function LeavePage() {
   const [allLeaves, setAllLeaves] = useState<LeaveItem[]>([])
 
   const [employees, setEmployees] = useState<Employee[]>([])
+
+  const [users, setUsers] = useState<UserItem[]>([])
 
   const [teamLeaves, setTeamLeaves] =
     useState<LeaveItem[]>([])
@@ -76,15 +88,17 @@ function LeavePage() {
 
   const [formData, setFormData] =
     useState({
-      employee_id: "",
       start_date: "",
       end_date: "",
       reason: "",
       leave_type: "SICK"
     })
 
-  const [decisionNote, setDecisionNote] =
-    useState("")
+  const [decisionNotes, setDecisionNotes] =
+    useState<Record<string, string>>({})
+
+  const [rejectionErrors, setRejectionErrors] =
+    useState<Record<string, boolean>>({})
 
   const canReview = useMemo(() =>
     isAdmin || isHr,
@@ -100,7 +114,9 @@ function LeavePage() {
       }
     > = {}
 
-    allLeaves.forEach((leave) => {
+    allLeaves
+      .filter((leave) => (leave.status || "").toUpperCase() === "APPROVED")
+      .forEach((leave) => {
       const key = leave.employee_id || leave.employee_email
 
       if (!key) {
@@ -123,6 +139,46 @@ function LeavePage() {
 
     return summary
   }, [allLeaves])
+
+  const currentEmployeeId = useMemo(() => {
+    if (!userEmail) {
+      return ""
+    }
+
+    const match = employees.find(
+      (employee) => employee.email.toLowerCase() === userEmail
+    )
+
+    return match?.id || ""
+  }, [employees, userEmail])
+
+  const userRoleByEmail = useMemo(() => {
+    const map: Record<string, string> = {}
+
+    // Prefer explicit user roles when available (admin only)
+    users.forEach((user) => {
+      if (user.email) {
+        map[user.email.toLowerCase()] = user.role
+      }
+    })
+
+    // Fallback: infer HR managers from `employees` list by department/designation
+    employees.forEach((emp) => {
+      try {
+        const email = (emp.email || "").toLowerCase()
+        if (!email) return
+
+        const dept = (emp.department || "").toLowerCase()
+        const desig = (emp.designation || "").toLowerCase()
+
+        if (dept.includes("human") && dept.includes("resourc") || desig.includes("hr") || desig.includes("human resources")) {
+          map[email] = "HR_MANAGER"
+        }
+      } catch (err) {}
+    })
+
+    return map
+  }, [users, employees])
 
   const upcomingLeaves = useMemo(() => {
     if (!isAdmin) {
@@ -172,7 +228,7 @@ function LeavePage() {
         new Date(a.start_date).getTime() -
         new Date(b.start_date).getTime()
       )
-  }, [allLeaves, isAdmin])
+  }, [allLeaves, isAdmin, userRoleByEmail])
 
   const fetchMyLeaves = async () => {
 
@@ -233,6 +289,15 @@ function LeavePage() {
     }
   }
 
+  const fetchUsers = async () => {
+    try {
+      const data = await listUsers()
+      setUsers(data.items || data || [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
 
   const fetchStats = async () => {
 
@@ -262,14 +327,20 @@ function LeavePage() {
 
   useEffect(() => {
 
-    if (!isAdmin) {
+    if (!(isAdmin || isHr)) {
       return
     }
 
     fetchAllLeaves()
     fetchEmployees()
 
-  }, [isAdmin])
+    // Fetch user list only for admins (endpoint is admin-only). HR will
+    // instead be able to infer HR-manager emails from the `employees` list.
+    if (isAdmin) {
+      fetchUsers()
+    }
+
+  }, [isAdmin, isHr])
 
   const handleApplyLeave = async () => {
 
@@ -278,6 +349,12 @@ function LeavePage() {
       setLoading(true)
       setError("")
       setSuccess("")
+
+      if (!formData.reason.trim()) {
+        setError("Reason is required.")
+        setLoading(false)
+        return
+      }
 
       const today = new Date()
       today.setHours(0, 0, 0, 0)
@@ -310,15 +387,33 @@ function LeavePage() {
         }
       }
 
+      const hasOverlap = myLeaves.some((leave) => {
+        if (leave.status === "REJECTED") {
+          return false
+        }
+
+        const existingStart = new Date(leave.start_date)
+        const existingEnd = new Date(leave.end_date)
+        existingStart.setHours(0, 0, 0, 0)
+        existingEnd.setHours(0, 0, 0, 0)
+
+        return startDate <= existingEnd && endDate >= existingStart
+      })
+
+      if (hasOverlap) {
+        setError("You already have a leave request overlapping these dates.")
+        setLoading(false)
+        return
+      }
+
+      const employeeIdToSend = currentEmployeeId || undefined
+
       await applyLeave({
         ...formData,
-        employee_id: canReview
-          ? formData.employee_id
-          : undefined
+        ...(employeeIdToSend ? { employee_id: employeeIdToSend } : {})
       })
 
       setFormData({
-        employee_id: "",
         start_date: "",
         end_date: "",
         reason: "",
@@ -356,7 +451,9 @@ function LeavePage() {
         EARLY_LOGOUT: 0
       }
 
-      myLeaves.forEach((l) => {
+      myLeaves
+        .filter((leave) => (leave.status || "").toUpperCase() === "APPROVED")
+        .forEach((l) => {
         try {
           const s = new Date(l.start_date)
           const e = new Date(l.end_date)
@@ -380,19 +477,39 @@ function LeavePage() {
       setError("")
       setSuccess("")
 
+      const note =
+        (decisionNotes[leaveId] || "").trim()
+
+      if (decision === "reject" && !note) {
+        setRejectionErrors((previous) => ({
+          ...previous,
+          [leaveId]: true
+        }))
+        setLoading(false)
+        return
+      }
+
       if (decision === "approve") {
         await approveLeave(
           leaveId,
-          { decision_note: decisionNote }
+          { decision_note: note }
         )
       } else {
         await rejectLeave(
           leaveId,
-          { decision_note: decisionNote }
+          { decision_note: note }
         )
       }
 
-      setDecisionNote("")
+      setDecisionNotes((previous) => ({
+        ...previous,
+        [leaveId]: ""
+      }))
+
+      setRejectionErrors((previous) => ({
+        ...previous,
+        [leaveId]: false
+      }))
 
       setSuccess(
         decision === "approve"
@@ -485,7 +602,7 @@ function LeavePage() {
 
       {!isAdmin && (
         <div className="mb-6">
-          <div className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-2xl p-6 shadow-md">
+          <div className="bg-linear-to-r from-violet-600 to-indigo-600 text-white rounded-2xl p-6 shadow-md">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-sm uppercase tracking-wider">Total Leave Balance</div>
@@ -527,21 +644,6 @@ function LeavePage() {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Apply Leave</h2>
 
             <div className="space-y-4">
-
-              {canReview && (
-                <input
-                  type="text"
-                  placeholder="Employee ID (optional)"
-                  value={formData.employee_id}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      employee_id: e.target.value
-                    })
-                  }
-                  className="w-full border border-gray-300 p-3 rounded-xl"
-                />
-              )}
 
               <input
                 type="date"
@@ -594,6 +696,7 @@ function LeavePage() {
                 placeholder="Reason"
                 value={formData.reason}
                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                required
                 className="w-full border border-gray-300 p-3 rounded-xl min-h-30"
               />
 
@@ -621,10 +724,10 @@ function LeavePage() {
             ) : (
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {upcomingLeaves.map((leave) => (
-                  <div
-                    key={leave.id}
-                    className="border border-gray-100 rounded-xl p-4"
-                  >
+                    <div
+                      key={leave.id}
+                      className="border border-gray-100 rounded-xl p-4"
+                    >
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
                         <p className="font-medium text-gray-800">
@@ -805,6 +908,64 @@ function LeavePage() {
 
                       </div>
 
+                      <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
+
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Decision note (optional)"
+                            value={decisionNotes[leave.id] || ""}
+                            onChange={(e) =>
+                              setDecisionNotes((previous) => ({
+                                ...previous,
+                                [leave.id]: e.target.value
+                              }))
+                            }
+                            className="w-full border border-gray-300 p-3 rounded-xl"
+                          />
+                          {rejectionErrors[leave.id] && (
+                            <p className="text-xs text-red-500 mt-1">
+                              Enter a rejection reason to continue.
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex gap-3">
+
+                          <button
+                            onClick={() =>
+                              handleDecision(
+                                leave.id,
+                                "approve"
+                              )
+                            }
+                            disabled={loading}
+                            className="bg-green-600 hover:bg-green-700 transition text-white px-4 py-2 rounded-xl disabled:bg-green-300"
+                          >
+
+                            Approve
+
+                          </button>
+
+                          <button
+                            onClick={() =>
+                              handleDecision(
+                                leave.id,
+                                "reject"
+                              )
+                            }
+                            disabled={loading}
+                            className="bg-red-500 hover:bg-red-600 transition text-white px-4 py-2 rounded-xl disabled:bg-red-300"
+                          >
+
+                            Reject
+
+                          </button>
+
+                        </div>
+
+                      </div>
+
                     </div>
                   ))}
 
@@ -885,53 +1046,73 @@ function LeavePage() {
 
                         </div>
 
-                        <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
+                        {(() => {
+                          const targetRole = userRoleByEmail[leave.employee_email?.toLowerCase() || ""] || ""
+                          const hideDecisionForHr = isHr && targetRole === "HR_MANAGER"
+                          if (hideDecisionForHr) {
+                            return null
+                          }
 
-                          <input
-                            type="text"
-                            placeholder="Decision note (optional)"
-                            value={decisionNote}
-                            onChange={(e) =>
-                              setDecisionNote(e.target.value)
-                            }
-                            className="flex-1 border border-gray-300 p-3 rounded-xl"
-                          />
+                          return (
+                            <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
 
-                          <div className="flex gap-3">
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  placeholder="Decision note (optional)"
+                                  value={decisionNotes[leave.id] || ""}
+                                  onChange={(e) =>
+                                    setDecisionNotes((previous) => ({
+                                      ...previous,
+                                      [leave.id]: e.target.value
+                                    }))
+                                  }
+                                  className="w-full border border-gray-300 p-3 rounded-xl"
+                                />
+                                {rejectionErrors[leave.id] && (
+                                  <p className="text-xs text-red-500 mt-1">
+                                    Enter a rejection reason to continue.
+                                  </p>
+                                )}
+                              </div>
 
-                            <button
-                              onClick={() =>
-                                handleDecision(
-                                  leave.id,
-                                  "approve"
-                                )
-                              }
-                              disabled={loading}
-                              className="bg-green-600 hover:bg-green-700 transition text-white px-4 py-2 rounded-xl disabled:bg-green-300"
-                            >
+                              <div className="flex gap-3">
 
-                              Approve
+                                <button
+                                  onClick={() =>
+                                    handleDecision(
+                                      leave.id,
+                                      "approve"
+                                    )
+                                  }
+                                  disabled={loading}
+                                  className="bg-green-600 hover:bg-green-700 transition text-white px-4 py-2 rounded-xl disabled:bg-green-300"
+                                >
 
-                            </button>
+                                  Approve
 
-                            <button
-                              onClick={() =>
-                                handleDecision(
-                                  leave.id,
-                                  "reject"
-                                )
-                              }
-                              disabled={loading}
-                              className="bg-red-500 hover:bg-red-600 transition text-white px-4 py-2 rounded-xl disabled:bg-red-300"
-                            >
+                                </button>
 
-                              Reject
+                                <button
+                                  onClick={() =>
+                                    handleDecision(
+                                      leave.id,
+                                      "reject"
+                                    )
+                                  }
+                                  disabled={loading}
+                                  className="bg-red-500 hover:bg-red-600 transition text-white px-4 py-2 rounded-xl disabled:bg-red-300"
+                                >
 
-                            </button>
+                                  Reject
 
-                          </div>
+                                </button>
 
-                        </div>
+                              </div>
+
+                            </div>
+                          )
+                        })()}
 
                       </div>
                     ))}
