@@ -116,28 +116,25 @@ function MainLayout({
 
           </Link>
 
-          {role === "EMPLOYEE" ? (
+          <Link
+            to="/calendar"
+            className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
 
-            <Link
-              to="/calendar"
-              className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
+            ${location.pathname === "/calendar"
 
-              ${location.pathname === "/calendar"
+              ? "bg-blue-600"
 
-                ? "bg-blue-600"
+              : "hover:bg-gray-700"
+            }`}
+          >
 
-                : "hover:bg-gray-700"
-              }`}
-            >
+            <FaCalendarAlt />
 
-              <FaCalendarAlt />
+            Calendar
 
-              Calendar
+          </Link>
 
-            </Link>
-
-          ) : (
-
+          {(role === "ADMIN" || role === "HR_MANAGER") && (
             <Link
               to="/employees"
               className={`flex items-center gap-3 transition p-3 rounded-xl text-base font-medium
@@ -155,7 +152,6 @@ function MainLayout({
               Employees
 
             </Link>
-
           )}
 
           <Link
@@ -209,11 +205,11 @@ function MainLayout({
 
         {/* TOP HEADER */}
 
-        <div className="bg-white shadow-sm px-6 py-3 flex justify-end items-center">
+        <div className="bg-white shadow-sm px-6 py-3">
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between gap-4">
 
-            <div className="text-right">
+            <div className="text-left">
 
               <p className="text-sm text-gray-500">
 
@@ -221,7 +217,7 @@ function MainLayout({
 
               </p>
 
-              <div className="flex items-center gap-2 justify-end">
+              <div className="flex items-center gap-2 justify-start">
 
                 <span
                   className={`text-white text-xs px-3 py-1 rounded-full font-semibold ${getRoleColor()}`}

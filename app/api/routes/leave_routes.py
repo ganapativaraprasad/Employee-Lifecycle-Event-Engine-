@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.core.dependencies import get_current_user, require_roles
 from app.core.enums.leave_status import LeaveStatus
 from app.core.enums.user_role import UserRole
+from app.core.enums.employee_state import EmployeeState
 from app.models.employee_model import Employee
 from app.models.leave_request_model import LeaveRequest
 from app.core.enums.leave_type import LeaveType
@@ -52,6 +53,34 @@ async def _resolve_employee(
                 status_code=404,
                 detail="Employee record not found"
             )
+
+        return employee
+
+    if current_user.role == UserRole.HR_MANAGER and not employee_id:
+        employee = await Employee.find_one(
+            Employee.email == current_user.email,
+            Employee.is_deleted == False
+        )
+
+        if employee:
+            return employee
+
+        name_parts = (current_user.username or "HR").split()
+        first_name = name_parts[0] if name_parts else "HR"
+        last_name = " ".join(name_parts[1:]) if len(name_parts) > 1 else "Manager"
+        employee_code = f"HR-{str(current_user.id)[-6:]}"
+
+        employee = Employee(
+            employee_code=employee_code,
+            first_name=first_name,
+            last_name=last_name,
+            email=current_user.email,
+            department="Human Resources",
+            designation="HR Manager",
+            current_state=EmployeeState.ACTIVE
+        )
+
+        await employee.insert()
 
         return employee
 
@@ -244,6 +273,34 @@ async def list_leaves(
             date_filter["$lte"] = end_to
         filters["start_date"] = date_filter
 
+    # If the requester is an HR manager, exclude leaves belonging to HR managers
+    # so HR users do not see/approve other HR manager leave requests. Admins
+    # still receive all requests. This is a server-side guard to ensure HR
+    # cannot approve HR manager leaves.
+    if current_user.role == UserRole.HR_MANAGER:
+        # collect HR manager emails
+        hr_users = await User.find(User.role == UserRole.HR_MANAGER).to_list()
+        hr_emails = [u.email.lower() for u in hr_users if u.email]
+
+        # only apply exclusion when not filtering for a specific employee
+        if not filters.get("employee_id"):
+            # merge with existing employee_email filter if present
+            existing = filters.get("employee_email")
+            if existing:
+                # if existing is dict (e.g. $in/$nin), leave it alone; otherwise
+                # attempt to build a $nin filter including hr_emails
+                if isinstance(existing, dict):
+                    # try to augment $nin
+                    if "$nin" in existing:
+                        existing["$nin"] = list(set(existing["$nin"]) | set(hr_emails))
+                    else:
+                        existing = {"$nin": hr_emails}
+                    filters["employee_email"] = existing
+                else:
+                    filters["employee_email"] = {"$nin": hr_emails}
+            else:
+                filters["employee_email"] = {"$nin": hr_emails}
+
     query = LeaveRequest.find(filters)
 
     total = await query.count()
@@ -304,6 +361,14 @@ async def approve_leave(
             detail="Only pending requests can be approved"
         )
 
+    # HR manager leaves must be approved/rejected only by an admin
+    target_user = await User.find_one(User.email == leave.employee_email)
+    if target_user and getattr(target_user, 'role', None) == UserRole.HR_MANAGER and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Only admin can approve HR manager leave requests"
+        )
+
     leave.status = LeaveStatus.APPROVED
     leave.approved_by = str(current_user.id)
     leave.approved_at = datetime.utcnow()
@@ -354,6 +419,14 @@ async def reject_leave(
         raise HTTPException(
             status_code=400,
             detail="Only pending requests can be rejected"
+        )
+
+    # HR manager leaves must be approved/rejected only by an admin
+    target_user = await User.find_one(User.email == leave.employee_email)
+    if target_user and getattr(target_user, 'role', None) == UserRole.HR_MANAGER and current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Only admin can reject HR manager leave requests"
         )
 
     leave.status = LeaveStatus.REJECTED
@@ -463,7 +536,8 @@ async def leave_calendar(
             "start_date": l.start_date.isoformat() if hasattr(l.start_date, 'isoformat') else str(l.start_date),
             "end_date": l.end_date.isoformat() if hasattr(l.end_date, 'isoformat') else str(l.end_date),
             "status": l.status,
-            "reason": l.reason
+            "reason": l.reason,
+            "leave_type": l.leave_type
         }
         for l in leaves
     ]
