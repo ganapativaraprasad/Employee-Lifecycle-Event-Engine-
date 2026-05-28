@@ -59,3 +59,36 @@ HR Team
 
     except Exception:
         logger.exception("Failed to send status change email.")
+
+
+async def send_password_reset_email(email: str, code: str):
+
+    if not settings.smtp_email or not settings.smtp_password:
+        logger.warning("SMTP credentials are not configured; password reset email skipped. Code: %s", code)
+        return
+
+    message = EmailMessage()
+    message["From"] = settings.smtp_email
+    message["To"] = email
+    message["Subject"] = "Password reset code"
+    message.set_content(
+        f"""
+Hello,
+
+Use the following code to reset your password: {code}
+
+If you did not request this, ignore this email.
+
+Regards,
+HR Team
+"""
+    )
+
+    try:
+        smtp = aiosmtplib.SMTP(hostname="smtp.gmail.com", port=587, start_tls=True, timeout=20)
+        await smtp.connect()
+        await smtp.login(settings.smtp_email, settings.smtp_password)
+        await smtp.send_message(message)
+        await smtp.quit()
+    except Exception:
+        logger.exception("Failed to send password reset email. Code: %s", code)
