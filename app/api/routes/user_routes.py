@@ -235,8 +235,13 @@ async def reset_password(
     if user.reset_code != payload.code:
         raise HTTPException(status_code=400, detail="Invalid code or email")
 
-    if getattr(user, 'reset_expires', None) and datetime.utcnow() > user.reset_expires:
-        raise HTTPException(status_code=400, detail="Reset code expired")
+    reset_expires = getattr(user, "reset_expires", None)
+
+    if reset_expires is not None and datetime.utcnow() > reset_expires:  
+        raise HTTPException(
+            status_code=400,
+            detail="Reset code expired"
+        )
 
     user.hashed_password = hash_password(payload.new_password)
     user.reset_code = None

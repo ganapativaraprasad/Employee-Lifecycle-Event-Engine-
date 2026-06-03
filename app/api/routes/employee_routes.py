@@ -7,7 +7,7 @@ from fastapi import (
 )
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 
 import os
 import shutil
@@ -44,7 +44,8 @@ from app.services.employee_service import (
 from fastapi import BackgroundTasks
 
 from app.services.notification_service import (
-    send_status_change_email
+    send_status_change_email,
+    send_welcome_email
 )
 
 router = APIRouter(
@@ -117,7 +118,7 @@ async def get_all_employees(
 
     skip = (page - 1) * limit
 
-    filters = {}
+    filters: dict[str, Any] = {}
 
     if department:
         filters["department"] = department
@@ -143,7 +144,7 @@ async def get_all_employees(
     filters["is_deleted"] = False
 
     if joined_from or joined_to:
-        date_filter = {}
+        date_filter: dict[str, Any] = {}
         if joined_from:
             date_filter["$gte"] = joined_from
         if joined_to:
@@ -206,23 +207,15 @@ async def get_all_employees(
     if sort_by in sortable_fields:
         sort_field = sort_by
 
-    sort_direction = -1
-
-    if sort_order == "asc":
-        sort_direction = 1
-
     total = await query.count()
 
-    query = query.sort(
-        (sort_field, sort_direction)
-    )
+    query = query.sort(sort_field)
 
     employees = await query \
         .skip(skip) \
         .limit(limit) \
         .to_list()
-
-    response = []
+    response: list[EmployeeResponseSchema] = []
 
     for employee in employees:
 
@@ -406,6 +399,12 @@ async def upload_employee_document(
         ".jpg",
         ".jpeg"
     ]
+
+    if file.filename is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Filename is missing"
+        )
 
     file_extension = os.path.splitext(
         file.filename

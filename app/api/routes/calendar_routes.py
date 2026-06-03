@@ -22,6 +22,8 @@ from app.schemas.holiday_schema import (
     HolidayResponseSchema,
     HolidayUpdateSchema
 )
+from datetime import date
+from typing import cast
 
 router = APIRouter(
     prefix="/calendar",
@@ -164,20 +166,22 @@ async def list_holidays(
     existing_count = await Holiday.find(
         Holiday.year == target_year
     ).count()
-
+    
     if target_year == 2026 and existing_count == 0:
         for holiday in DEFAULT_HOLIDAYS_2026:
+
+            holiday_date = cast(date, holiday["date"])
+
             await Holiday(
                 name=holiday["name"],
                 description=holiday["description"],
-                date=holiday["date"],
-                year=holiday["date"].year,
+                date=holiday_date,
+                year=holiday_date.year,
                 type=holiday["type"]
             ).insert()
-
     query = Holiday.find(
         Holiday.year == target_year
-    ).sort(("date", 1))
+    ).sort("date")
 
     total = await query.count()
 
@@ -328,7 +332,7 @@ async def list_events(
     total = await query.count()
 
     items = await query.sort(
-        ("date", 1)
+        "date"
     ).skip((page - 1) * limit).limit(limit).to_list()
 
     return CalendarEventListResponseSchema(

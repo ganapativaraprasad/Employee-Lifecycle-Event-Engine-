@@ -62,7 +62,7 @@ async def get_dashboard_stats(
     ).to_list()
 
     recent_activities = await AuditLog.find().sort(
-        -AuditLog.created_at
+        "-created_at"
     ).limit(8).to_list()
 
     return {

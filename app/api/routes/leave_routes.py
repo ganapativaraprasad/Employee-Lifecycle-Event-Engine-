@@ -1,7 +1,10 @@
 from datetime import date, datetime
-from typing import Optional
+from typing import Any, Optional
 
+from alembic.util import status
+from dns.resolver import query
 from fastapi import APIRouter, Depends, HTTPException
+from mako import filters
 
 from app.core.dependencies import get_current_user, require_roles
 from app.core.enums.leave_status import LeaveStatus
@@ -204,7 +207,7 @@ async def list_my_leaves(
     total = await query.count()
 
     leaves = await query.sort(
-        ("created_at", -1)
+        "-created_at"
     ).skip(skip).limit(limit).to_list()
 
     return LeaveListResponseSchema(
@@ -250,8 +253,26 @@ async def list_leaves(
 ):
 
     skip = (page - 1) * limit
+    from typing import Any
+    filters: dict[str, Any] = {}
 
-    filters = {}
+    if current_user.role == UserRole.EMPLOYEE:
+
+        employee = await Employee.find_one(
+            Employee.email == current_user.email,
+            Employee.is_deleted == False
+        )
+
+        if not employee:
+            raise HTTPException(
+                status_code=404,
+                detail="Employee record not found"
+            )
+
+        filters["employee_id"] = str(employee.id)
+
+    else:
+        filters["requested_by"] = str(current_user.id)
 
     if status:
         try:
@@ -262,51 +283,12 @@ async def list_leaves(
                 detail="Invalid status filter"
             )
 
-    if employee_id:
-        filters["employee_id"] = employee_id
-
-    if start_from or end_to:
-        date_filter = {}
-        if start_from:
-            date_filter["$gte"] = start_from
-        if end_to:
-            date_filter["$lte"] = end_to
-        filters["start_date"] = date_filter
-
-    # If the requester is an HR manager, exclude leaves belonging to HR managers
-    # so HR users do not see/approve other HR manager leave requests. Admins
-    # still receive all requests. This is a server-side guard to ensure HR
-    # cannot approve HR manager leaves.
-    if current_user.role == UserRole.HR_MANAGER:
-        # collect HR manager emails
-        hr_users = await User.find(User.role == UserRole.HR_MANAGER).to_list()
-        hr_emails = [u.email.lower() for u in hr_users if u.email]
-
-        # only apply exclusion when not filtering for a specific employee
-        if not filters.get("employee_id"):
-            # merge with existing employee_email filter if present
-            existing = filters.get("employee_email")
-            if existing:
-                # if existing is dict (e.g. $in/$nin), leave it alone; otherwise
-                # attempt to build a $nin filter including hr_emails
-                if isinstance(existing, dict):
-                    # try to augment $nin
-                    if "$nin" in existing:
-                        existing["$nin"] = list(set(existing["$nin"]) | set(hr_emails))
-                    else:
-                        existing = {"$nin": hr_emails}
-                    filters["employee_email"] = existing
-                else:
-                    filters["employee_email"] = {"$nin": hr_emails}
-            else:
-                filters["employee_email"] = {"$nin": hr_emails}
-
     query = LeaveRequest.find(filters)
 
     total = await query.count()
 
     leaves = await query.sort(
-        ("created_at", -1)
+            "-created_at"
     ).skip(skip).limit(limit).to_list()
 
     return LeaveListResponseSchema(
@@ -499,7 +481,9 @@ async def leave_calendar(
     Employees only receive their own leaves; admins/hr receive all.
     """
 
-    filters = {}
+    from typing import Any
+
+    filters: dict[str, Any] = {}
 
     # If year provided, limit by start_date year or end_date year
     if year:
@@ -525,7 +509,7 @@ async def leave_calendar(
 
     query = LeaveRequest.find(filters)
 
-    leaves = await query.sort(("start_date", 1)).to_list()
+    leaves = await query.sort("start_date").to_list()
 
     # Map to simple event objects for frontend calendar
     events = [
@@ -535,7 +519,7 @@ async def leave_calendar(
             "employee_name": l.employee_name,
             "start_date": l.start_date.isoformat() if hasattr(l.start_date, 'isoformat') else str(l.start_date),
             "end_date": l.end_date.isoformat() if hasattr(l.end_date, 'isoformat') else str(l.end_date),
-            "status": l.status,
+            "status": l.status.value,
             "reason": l.reason,
             "leave_type": l.leave_type
         }

@@ -16,7 +16,7 @@ oauth2_scheme = OAuth2PasswordBearer(
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme)
-):
+) -> User:
 
     credentials_exception = HTTPException(
         status_code=401,
@@ -31,7 +31,7 @@ async def get_current_user(
             algorithms=[ALGORITHM]
         )
 
-        user_id: str = payload.get("user_id")
+        user_id: str | None = payload.get("user_id")
 
         if user_id is None:
             raise credentials_exception
@@ -52,11 +52,12 @@ async def get_current_user(
 
     return user
 
+
 def require_roles(allowed_roles: list):
 
     async def role_checker(
         current_user: User = Depends(get_current_user)
-    ):
+    ) -> User:
 
         if current_user.role not in allowed_roles:
 

@@ -92,3 +92,60 @@ HR Team
         await smtp.quit()
     except Exception:
         logger.exception("Failed to send password reset email. Code: %s", code)
+
+async def send_welcome_email(
+    email: str,
+    first_name: str
+):
+
+    if not settings.smtp_email or not settings.smtp_password:
+        logger.warning(
+            "SMTP credentials are not configured; welcome email skipped."
+        )
+        return
+
+    message = EmailMessage()
+
+    message["From"] = settings.smtp_email
+    message["To"] = email
+    message["Subject"] = "Welcome to the Organization"
+
+    message.set_content(
+        f"""
+Hello {first_name},
+
+Welcome to the organization.
+
+Your employee profile has been activated successfully.
+
+We are excited to have you onboard.
+
+Regards,
+HR Team
+"""
+    )
+
+    try:
+
+        smtp = aiosmtplib.SMTP(
+            hostname="smtp.gmail.com",
+            port=587,
+            start_tls=True,
+            timeout=20
+        )
+
+        await smtp.connect()
+
+        await smtp.login(
+            settings.smtp_email,
+            settings.smtp_password
+        )
+
+        await smtp.send_message(message)
+
+        await smtp.quit()
+
+    except Exception:
+        logger.exception(
+            "Failed to send welcome email."
+        )
