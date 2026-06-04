@@ -38,6 +38,11 @@ from app.api.routes.calendar_routes import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import WebSocket
 from app.websocket.manager import manager
+import asyncio
+
+from app.services.event_worker import (
+    process_events
+)
 
 app = FastAPI()
 app.add_middleware(
@@ -83,7 +88,9 @@ async def app_init():
             CalendarEvent
         ]
     )
-
+    asyncio.create_task(
+        process_events()
+    )
 
 app.include_router(
     employee_router,

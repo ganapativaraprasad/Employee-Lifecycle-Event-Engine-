@@ -79,38 +79,19 @@ class EmployeeService:
 
         await employee.save()
 
-        await send_status_change_email(
-            employee_email=employee.email,
-            employee_name=employee.first_name,
-            old_state=current_state,
-            new_state=new_state
-        )
-        await manager.broadcast(
-            f"Employee {employee.employee_code} moved from {current_state} to {new_state}"
-            )
+    
 
-        audit_log = AuditLog(
-            employee_id=str(employee.id),
-
-            actor_id=actor_id,
-
-            action=AuditAction.TRANSITION,
-
-            old_state=current_state,
-            new_state=new_state,
-
-            reason=transition_data.reason
-        )
-
-        await audit_log.insert()
-        
         await publish_event(
-            event_name="EMPLOYEE_STATE_CHANGED",
-            payload={
+        event_name="EMPLOYEE_STATE_CHANGED",
+        payload={
             "employee_id": str(employee.id),
+            "employee_email": employee.email,
+            "employee_name": employee.first_name,
+            "employee_code": employee.employee_code,
+            "actor_id": actor_id,
             "old_state": current_state,
-            "new_state": new_state
+            "new_state": new_state,
+            "reason": transition_data.reason
             }
         )
-
         return employee
