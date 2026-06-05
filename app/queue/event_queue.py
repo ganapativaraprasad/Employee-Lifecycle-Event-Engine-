@@ -1,6 +1,7 @@
 import asyncio
+from typing import Any
 
-event_queue = asyncio.Queue()
+event_queue: asyncio.Queue[Any] = asyncio.Queue()
 
 
 async def publish_event(
