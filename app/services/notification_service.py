@@ -13,7 +13,7 @@ async def send_status_change_email(
     employee_name: str,
     old_state: str,
     new_state: str
-):
+) -> None:
 
     if not settings.smtp_email or not settings.smtp_password:
         logger.warning("SMTP credentials are not configured; email skipped.")
@@ -61,7 +61,10 @@ HR Team
         logger.exception("Failed to send status change email.")
 
 
-async def send_password_reset_email(email: str, code: str):
+async def send_password_reset_email(
+    email: str,
+    code: str
+) -> None:
 
     if not settings.smtp_email or not settings.smtp_password:
         logger.warning("SMTP credentials are not configured; password reset email skipped. Code: %s", code)
@@ -96,7 +99,7 @@ HR Team
 async def send_welcome_email(
     email: str,
     first_name: str
-):
+) -> None:
 
     if not settings.smtp_email or not settings.smtp_password:
         logger.warning(

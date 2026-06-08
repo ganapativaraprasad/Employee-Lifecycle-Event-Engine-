@@ -24,6 +24,7 @@ from app.schemas.holiday_schema import (
 )
 from datetime import date
 from typing import cast
+from typing import Any
 
 router = APIRouter(
     prefix="/calendar",
@@ -160,7 +161,7 @@ async def list_holidays(
             UserRole.EMPLOYEE
         ])
     )
-):
+) -> HolidayListResponseSchema:
     target_year = year or date.today().year
 
     existing_count = await Holiday.find(
@@ -217,7 +218,7 @@ async def create_holiday(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> HolidayResponseSchema:
     holiday = Holiday(
         name=payload.name,
         description=payload.description or payload.name,
@@ -249,7 +250,7 @@ async def update_holiday(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> HolidayResponseSchema:
     holiday = await Holiday.get(holiday_id)
 
     if not holiday:
@@ -287,7 +288,7 @@ async def delete_holiday(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> dict[str, str]:
     holiday = await Holiday.get(holiday_id)
 
     if not holiday:
@@ -304,7 +305,7 @@ async def list_events(
     page: int = 1,
     limit: int = 1000,
     current_user: User = Depends(get_current_user)
-):
+) -> CalendarEventListResponseSchema:
     target_year = year or date.today().year
 
     query = CalendarEvent.find(
@@ -363,7 +364,7 @@ async def list_events(
 async def create_event(
     payload: CalendarEventCreateSchema,
     current_user: User = Depends(get_current_user)
-):
+) -> CalendarEventResponseSchema:
     if payload.event_type in [EventType.COMPANY, EventType.TEAM]:
         if current_user.role not in [UserRole.ADMIN, UserRole.HR_MANAGER]:
             raise HTTPException(status_code=403, detail="Permission denied")
@@ -404,7 +405,7 @@ async def update_event(
     event_id: str,
     payload: CalendarEventUpdateSchema,
     current_user: User = Depends(get_current_user)
-):
+) -> CalendarEventResponseSchema:
     event = await CalendarEvent.get(event_id)
 
     if not event:
@@ -445,7 +446,7 @@ async def update_event(
 async def delete_event(
     event_id: str,
     current_user: User = Depends(get_current_user)
-):
+) -> dict[str, str]:
     event = await CalendarEvent.get(event_id)
 
     if not event:

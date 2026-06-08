@@ -6,6 +6,7 @@ from app.core.enums.user_role import UserRole
 from app.models.audit_log_model import AuditLog
 from app.models.employee_model import Employee
 from app.models.user_model import User
+from typing import Any
 
 router = APIRouter(
     prefix="/dashboard",
@@ -22,7 +23,7 @@ async def get_dashboard_stats(
             UserRole.EMPLOYEE
         ])
     )
-):
+) -> dict[str, Any]:
 
     total_employees = await Employee.find(
         Employee.is_deleted == False

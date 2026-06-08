@@ -38,7 +38,7 @@ class EmployeeService:
     @staticmethod
     async def create_employee(
         employee_data: EmployeeCreateSchema
-    ):
+    ) -> Employee:
 
         employee = Employee(
             **employee_data.dict()
@@ -53,7 +53,7 @@ class EmployeeService:
         employee_id: str,
         transition_data: TransitionSchema,
         actor_id: str
-    ):
+    ) -> Employee:
 
         employee = await Employee.get(employee_id)
 

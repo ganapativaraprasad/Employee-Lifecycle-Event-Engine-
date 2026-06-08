@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.security import ALGORITHM
 
 from app.models.user_model import User
-
+from typing import Callable, Any
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/login"
@@ -53,7 +53,9 @@ async def get_current_user(
     return user
 
 
-def require_roles(allowed_roles: list):
+def require_roles(
+    allowed_roles: list[str]
+) -> Callable[..., Any]:
 
     async def role_checker(
         current_user: User = Depends(get_current_user)

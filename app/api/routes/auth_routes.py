@@ -16,7 +16,7 @@ from app.core.security import (
 )
 
 from app.core.config import settings
-
+from typing import Any
 
 router = APIRouter(
     prefix="/auth",
@@ -27,7 +27,7 @@ router = APIRouter(
 @router.post("/login")
 async def login_user(
     form_data: OAuth2PasswordRequestForm = Depends()
-):
+)-> dict[str, Any]:
 
     user = await User.find_one(
         User.email == form_data.username
@@ -80,7 +80,7 @@ async def login_user(
 @router.post("/refresh")
 async def refresh_access_token(
     refresh_token: str
-):
+)-> dict[str, str]:
 
     try:
 

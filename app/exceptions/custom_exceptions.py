@@ -1,6 +1,6 @@
 class EmployeeNotFoundException(Exception):
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         super().__init__("Employee not found")
 
@@ -9,7 +9,11 @@ class EmployeeNotFoundException(Exception):
 
 class InvalidTransitionException(Exception):
 
-    def __init__(self, current_state, new_state):
+    def __init__(
+        self,
+        current_state: str,
+        new_state: str
+    ) -> None:
 
         message = (
             f"Invalid transition from "
@@ -23,7 +27,7 @@ class InvalidTransitionException(Exception):
 
 class PermissionDeniedException(Exception):
 
-    def __init__(self):
+    def __init__(self) -> None:
 
         super().__init__("Permission denied")
 

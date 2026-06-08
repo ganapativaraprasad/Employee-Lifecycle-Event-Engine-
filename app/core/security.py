@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 
-
+from typing import Any
 
 pwd_context = CryptContext(
     schemes=["bcrypt"],
@@ -32,9 +32,9 @@ def verify_password(
 
 
 def create_access_token(
-    data: dict,
+    data: dict[str, Any],
     expires_delta: timedelta = timedelta(hours=24)
-):
+) -> str:
 
     to_encode = data.copy()
 
@@ -51,8 +51,8 @@ def create_access_token(
     return encoded_jwt
 
 def create_refresh_token(
-    data: dict
-):
+    data: dict[str, Any]
+) -> str:
 
     to_encode = data.copy()
 

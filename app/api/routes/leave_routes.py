@@ -21,6 +21,8 @@ from app.schemas.leave_schema import (
     LeaveResponseSchema
 )
 
+from typing import Any
+
 router = APIRouter(
     prefix="/leaves",
     tags=["Leaves"]
@@ -30,7 +32,7 @@ router = APIRouter(
 def _ensure_date_range(
     start_date: date,
     end_date: date
-):
+) -> None:
 
     if start_date > end_date:
         raise HTTPException(
@@ -114,7 +116,7 @@ async def apply_leave(
             UserRole.EMPLOYEE
         ])
     )
-):
+) -> LeaveResponseSchema:
 
     _ensure_date_range(
         payload.start_date,
@@ -169,7 +171,7 @@ async def list_my_leaves(
             UserRole.EMPLOYEE
         ])
     )
-):
+) -> LeaveListResponseSchema:
 
     skip = (page - 1) * limit
 
@@ -250,7 +252,7 @@ async def list_leaves(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> LeaveListResponseSchema:
 
     skip = (page - 1) * limit
     from typing import Any
@@ -327,7 +329,7 @@ async def approve_leave(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> LeaveResponseSchema:
 
     leave = await LeaveRequest.get(leave_id)
 
@@ -387,7 +389,7 @@ async def reject_leave(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> LeaveResponseSchema:
 
     leave = await LeaveRequest.get(leave_id)
 
@@ -445,7 +447,7 @@ async def leave_stats(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> dict[str, int]:
 
     pending = await LeaveRequest.find(
         LeaveRequest.status == LeaveStatus.PENDING
@@ -476,7 +478,7 @@ async def leave_calendar(
             UserRole.EMPLOYEE
         ])
     )
-):
+) -> dict[str, Any]:
     """Return leave events for calendar view. If `year` provided, filter by that year.
     Employees only receive their own leaves; admins/hr receive all.
     """

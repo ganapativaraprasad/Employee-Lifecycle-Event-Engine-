@@ -76,7 +76,7 @@ app.include_router(
 )
 
 @app.on_event("startup")
-async def app_init():
+async def app_init()-> None:
     await init_beanie(
         database=db,
         document_models=[
@@ -100,7 +100,7 @@ app.include_router(
 
 
 @app.get("/")
-async def root():
+async def root()-> dict[str, str]:
     return {
         "message": "Employee Lifecycle Engine Running"
     }
@@ -128,7 +128,7 @@ app.include_router(
 @app.websocket("/ws")
 async def websocket_endpoint(
     websocket: WebSocket
-):
+)-> None:
 
     await manager.connect(websocket)
 

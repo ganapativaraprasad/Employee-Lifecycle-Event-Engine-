@@ -1,5 +1,6 @@
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse
 
 from app.exceptions.custom_exceptions import (
     EmployeeNotFoundException,
@@ -11,7 +12,7 @@ from app.exceptions.custom_exceptions import (
 async def employee_not_found_handler(
     request: Request,
     exc: Exception
-):
+)-> JSONResponse:
     error = exc
 
     return JSONResponse(
@@ -30,7 +31,7 @@ async def employee_not_found_handler(
 async def invalid_transition_handler(
     request: Request,
     exc: Exception
-):
+)-> JSONResponse:
     error = exc
 
     return JSONResponse(
@@ -49,7 +50,7 @@ async def invalid_transition_handler(
 async def permission_denied_handler(
     request: Request,
     exc: Exception
-):
+) -> JSONResponse:
     error = exc
 
     return JSONResponse(

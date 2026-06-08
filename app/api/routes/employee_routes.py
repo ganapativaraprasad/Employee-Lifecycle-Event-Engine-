@@ -63,7 +63,7 @@ async def create_employee(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> dict[str, Any]:
 
     employee = await EmployeeService.create_employee(
         employee_data
@@ -114,7 +114,7 @@ async def get_all_employees(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> EmployeeListResponseSchema:
 
     skip = (page - 1) * limit
 
@@ -251,7 +251,7 @@ async def get_employee_by_id(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> EmployeeResponseSchema:
 
     employee = await Employee.get(employee_id)
 
@@ -284,7 +284,7 @@ async def update_employee(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> dict[str, str]:
 
     employee = await Employee.get(employee_id)
 
@@ -314,7 +314,7 @@ async def delete_employee(
     current_user: User = Depends(
         require_roles([UserRole.ADMIN])
     )
-):
+) -> dict[str, str]:
 
     employee = await Employee.get(employee_id)
 
@@ -347,7 +347,7 @@ async def transition_employee(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> dict[str, str]:
 
     employee = await EmployeeService.transition_employee(
         employee_id=employee_id,
@@ -382,7 +382,7 @@ async def upload_employee_document(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> dict[str, str]:
 
     employee = await Employee.get(employee_id)
 
@@ -462,7 +462,7 @@ async def download_employee_document(
             UserRole.HR_MANAGER
         ])
     )
-):
+) -> FileResponse:
 
     file_path = f"uploads/{file_name}"
 

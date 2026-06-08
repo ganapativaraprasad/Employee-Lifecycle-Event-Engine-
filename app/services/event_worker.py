@@ -10,44 +10,58 @@ from app.models.audit_log_model import AuditLog
 
 from app.core.enums.audit_action import AuditAction
 
+import logging
 
-async def process_events():
+logger = logging.getLogger(__name__)
+
+
+async def process_events() -> None:
 
     while True:
 
         event = await event_queue.get()
 
-        event_name = event["event_name"]
+        try:
 
-        payload = event["payload"]
+            event_name = event["event_name"]
 
-        print(
-            f"Processing Event: {event_name}"
-        )
+            payload = event["payload"]
 
-        if event_name == "EMPLOYEE_STATE_CHANGED":
-
-            await send_status_change_email(
-                employee_email=payload["employee_email"],
-                employee_name=payload["employee_name"],
-                old_state=payload["old_state"],
-                new_state=payload["new_state"]
+            print(
+                f"Processing Event: {event_name}"
             )
 
-            await manager.broadcast(
-                f"Employee {payload['employee_code']} moved from "
-                f"{payload['old_state']} to {payload['new_state']}"
+            if event_name == "EMPLOYEE_STATE_CHANGED":
+
+                await send_status_change_email(
+                    employee_email=payload["employee_email"],
+                    employee_name=payload["employee_name"],
+                    old_state=payload["old_state"],
+                    new_state=payload["new_state"]
+                )
+
+                await manager.broadcast(
+                    f"Employee {payload['employee_code']} moved from "
+                    f"{payload['old_state']} to {payload['new_state']}"
+                )
+
+                audit_log = AuditLog(
+                    employee_id=payload["employee_id"],
+                    actor_id=payload["actor_id"],
+                    action=AuditAction.TRANSITION,
+                    old_state=payload["old_state"],
+                    new_state=payload["new_state"],
+                    reason=payload["reason"]
+                )
+
+                await audit_log.insert()
+
+        except Exception as e:
+
+            logger.exception(
+                f"Event processing failed: {e}"
             )
 
-            audit_log = AuditLog(
-                employee_id=payload["employee_id"],
-                actor_id=payload["actor_id"],
-                action=AuditAction.TRANSITION,
-                old_state=payload["old_state"],
-                new_state=payload["new_state"],
-                reason=payload["reason"]
-            )
+        finally:
 
-            await audit_log.insert()
-
-        event_queue.task_done()
+            event_queue.task_done()

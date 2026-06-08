@@ -15,7 +15,7 @@ from app.schemas.user_schema import ForgotPasswordSchema, ResetPasswordSchema
 from datetime import datetime, timedelta
 import random
 from app.services.notification_service import send_password_reset_email
-
+from typing import Any
 router = APIRouter(
     prefix="/users",
     tags=["Users"]
@@ -31,7 +31,7 @@ async def create_user(
             UserRole.HR_MANAGER
         ])
     )
-):
+)-> UserResponseSchema:
 
     if current_user.role == UserRole.HR_MANAGER:
 
@@ -76,7 +76,7 @@ async def list_users(
     current_user: User = Depends(
         require_roles([UserRole.ADMIN])
     )
-):
+)-> list[UserResponseSchema]:
 
     users = await User.find().to_list()
 
@@ -95,7 +95,7 @@ async def list_users(
 @router.get("/me", response_model=UserResponseSchema)
 async def get_my_profile(
     current_user: User = Depends(get_current_user)
-):
+) -> UserResponseSchema:
 
     return UserResponseSchema(
         id=str(current_user.id),
@@ -110,7 +110,7 @@ async def get_my_profile(
 async def update_my_profile(
     payload: UserUpdateSchema,
     current_user: User = Depends(get_current_user)
-):
+) -> UserResponseSchema:
 
     update_data = payload.dict(
         exclude_unset=True
@@ -146,7 +146,7 @@ async def update_my_profile(
 async def change_my_password(
     payload: ChangePasswordSchema,
     current_user: User = Depends(get_current_user)
-):
+) -> dict[str, str]:
 
     if not verify_password(
         payload.current_password,
@@ -175,7 +175,7 @@ async def admin_set_password(
     current_user: User = Depends(
         require_roles([UserRole.ADMIN])
     )
-):
+) -> dict[str, str]:
 
     user = await User.get(user_id)
 
@@ -199,7 +199,7 @@ async def admin_set_password(
 @router.post("/forgot-password")
 async def forgot_password(
     payload: ForgotPasswordSchema
-):
+) -> dict[str, str]:
 
     user = await User.find_one(User.email == payload.email)
 
@@ -225,7 +225,7 @@ async def forgot_password(
 @router.post("/reset-password")
 async def reset_password(
     payload: ResetPasswordSchema
-):
+) -> dict[str, str]:
 
     user = await User.find_one(User.email == payload.email)
 

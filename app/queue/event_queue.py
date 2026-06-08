@@ -6,8 +6,8 @@ event_queue: asyncio.Queue[Any] = asyncio.Queue()
 
 async def publish_event(
     event_name: str,
-    payload: dict
-):
+    payload: dict[str, Any]
+) -> None:
 
     await event_queue.put(
         {
