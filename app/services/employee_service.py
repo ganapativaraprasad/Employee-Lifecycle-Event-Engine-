@@ -92,6 +92,6 @@ class EmployeeService:
             "old_state": current_state,
             "new_state": new_state,
             "reason": transition_data.reason
-            }
+            },
         )
         return employee

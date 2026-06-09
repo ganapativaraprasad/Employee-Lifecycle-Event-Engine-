@@ -290,7 +290,7 @@ async def list_leaves(
     total = await query.count()
 
     leaves = await query.sort(
-            "-created_at"
+        "-created_at"
     ).skip(skip).limit(limit).to_list()
 
     return LeaveListResponseSchema(
