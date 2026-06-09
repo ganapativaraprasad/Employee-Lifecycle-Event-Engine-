@@ -82,16 +82,16 @@ class EmployeeService:
     
 
         await publish_event(
-        event_name="EMPLOYEE_STATE_CHANGED",
-        payload={
-            "employee_id": str(employee.id),
-            "employee_email": employee.email,
-            "employee_name": employee.first_name,
-            "employee_code": employee.employee_code,
-            "actor_id": actor_id,
-            "old_state": current_state,
-            "new_state": new_state,
-            "reason": transition_data.reason
-            },
-        )
+            event_name="EMPLOYEE_STATE_CHANGED",
+            payload={
+                "employee_id": str(employee.id),
+                "employee_email": employee.email,
+                "employee_name": employee.first_name,
+                "employee_code": employee.employee_code,
+                "actor_id": actor_id,
+                "old_state": current_state,
+                "new_state": new_state,
+                "reason": transition_data.reason
+                },
+            )
         return employee
