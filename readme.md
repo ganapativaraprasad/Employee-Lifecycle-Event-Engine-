@@ -1,5 +1,9 @@
 # Employee Lifecycle Event Engine
 
+![CI Pipeline](https://github.com/ganapativaraprasad/Employee-Lifecycle-Event-Engine-/actions/workflows/ci.yml/badge.svg)
+
+Employee Lifecycle Management System built using FastAPI, MongoDB and Beanie.
+
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.136.1-teal)
 ![MongoDB](https://img.shields.io/badge/MongoDB-Beanie%20ODM-green)
@@ -211,15 +215,29 @@ smtp_password=
 
 # Testing
 
-- Automated FSM and RBAC validation was performed during development and Sprint 2.
-- Test suites are intentionally excluded from the public repository.
-- The current repository does not include test files.
+The project includes automated test coverage for:
 
-Execution example used during development:
+- FSM (Finite State Machine) transitions
+- RBAC (Role-Based Access Control)
 
+Run tests using:
+
+```bash
+pytest tests
 ```
-pytest
+
+Generate a coverage report:
+
+```bash
+pytest --cov=app --cov-report=term
 ```
+
+Current test suite:
+
+- 35 FSM test cases
+- 6 RBAC test cases
+- 41 tests total
+- All tests passing
 
 # Type Safety
 
@@ -233,8 +251,8 @@ mypy app
 
 Recent validation result:
 
-```
-Success: no issues found in 46 source files
+```text
+Success: no issues found in 47 source files
 ```
 
 Type checking has been applied across API routes, services, models, exception handlers, and core modules.
@@ -252,13 +270,26 @@ Implemented security hardening measures:
 
 # Future Enhancements
 
-- Add unit and integration tests for FSM, RBAC, and API flows
+- Expand API unit and integration test coverage
 - Expand audit logging to cover create/update/delete actions
 - Add refresh token revocation and session management
 - Add targeted WebSocket channels instead of broadcast-only updates
-- Add CI pipelines for linting, MyPy, and test automation
+- Add Prometheus metrics and Grafana dashboards
+- Add advanced CI/CD deployment automation
+
+## Continuous Integration (CI)
+
+This project uses GitHub Actions for Continuous Integration.
+
+Every push and pull request to the main branch automatically runs:
+
+- Flake8 linting
+- MyPy strict type checking
+- Pytest test suite
+- Docker image build validation
+
+The CI pipeline must pass before code is merged into the main branch.
 
 # Author
 
 Maintained by the Employee Lifecycle Event Engine team.
-
