@@ -49,6 +49,7 @@ class EmployeeService:
         return employee
 
     @staticmethod
+    @staticmethod
     async def transition_employee(
         employee_id: str,
         transition_data: TransitionSchema,
@@ -59,8 +60,8 @@ class EmployeeService:
 
         if not employee:
             raise EmployeeNotFoundException()
-        current_state = employee.current_state
 
+        current_state = employee.current_state
         new_state = transition_data.new_state
 
         is_allowed = is_transition_allowed(
@@ -69,7 +70,6 @@ class EmployeeService:
         )
 
         if not is_allowed:
-
             raise InvalidTransitionException(
                 current_state,
                 new_state
@@ -78,8 +78,6 @@ class EmployeeService:
         employee.current_state = new_state
 
         await employee.save()
-
-    
 
         await publish_event(
             event_name="EMPLOYEE_STATE_CHANGED",
@@ -91,7 +89,8 @@ class EmployeeService:
                 "actor_id": actor_id,
                 "old_state": current_state,
                 "new_state": new_state,
-                "reason": transition_data.reason
-                },
-            )
+                "reason": transition_data.reason,
+            },
+        )
+
         return employee
