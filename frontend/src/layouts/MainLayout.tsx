@@ -3,10 +3,8 @@ import { useState } from "react"
 import {
   FaTachometerAlt,
   FaUsers,
-  FaUserPlus,
   FaCalendarAlt,
   FaUserCog,
-  FaSignOutAlt,
   FaUserCircle
 } from "react-icons/fa"
 

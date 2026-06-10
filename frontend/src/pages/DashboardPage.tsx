@@ -627,7 +627,7 @@ function DashboardPage() {
                 <div className="w-48 h-48">
                   <svg viewBox="0 0 42 42" className="w-full h-full">
                     {departmentChart.reduce(
-                      (segments, item, index) => {
+                      (segments, item) => {
                         const previous = segments.total
                         const strokeDasharray = `${item.percent} ${100 - item.percent}`
                         const strokeDashoffset = 25 - previous
@@ -651,7 +651,7 @@ function DashboardPage() {
                       },
                       {
                         total: 0,
-                        nodes: [] as JSX.Element[]
+                        nodes: [] as React.ReactNode[]
                       }
                     ).nodes}
                   </svg>
