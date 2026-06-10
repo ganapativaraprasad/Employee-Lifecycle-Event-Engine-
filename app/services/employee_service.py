@@ -1,3 +1,5 @@
+from threading import active_count
+
 from fastapi import HTTPException
 
 from app.models.employee_model import Employee
@@ -32,6 +34,13 @@ from app.websocket.manager import manager
 from app.services.notification_service import (
     send_status_change_email
 )
+from app.core.metrics import (
+    employee_state_transitions_total,
+    active_employees_gauge
+)
+from app.core.enums.employee_state import (
+    EmployeeState
+)
 
 class EmployeeService:
 
@@ -47,8 +56,7 @@ class EmployeeService:
         await employee.insert()
 
         return employee
-
-    @staticmethod
+    
     @staticmethod
     async def transition_employee(
         employee_id: str,
@@ -78,6 +86,23 @@ class EmployeeService:
         employee.current_state = new_state
 
         await employee.save()
+        active_count = await Employee.find(
+            Employee.current_state == EmployeeState.ACTIVE
+        ).count()
+
+        print(f"ACTIVE COUNT = {active_count}")
+
+        active_employees_gauge.set(active_count)
+
+        print("GAUGE UPDATED")
+
+        employee_state_transitions_total.labels(
+            from_state=current_state,
+            to_state=new_state,
+            role="HR"
+        ).inc()
+
+        print("COUNTER UPDATED")
 
         await publish_event(
             event_name="EMPLOYEE_STATE_CHANGED",

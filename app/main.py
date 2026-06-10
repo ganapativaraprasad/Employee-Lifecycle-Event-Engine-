@@ -1,3 +1,4 @@
+from prometheus_fastapi_instrumentator import Instrumentator
 from fastapi import FastAPI
 from beanie import init_beanie
 from app.core.database import db
@@ -45,6 +46,7 @@ from app.services.event_worker import (
 )
 
 app = FastAPI()
+Instrumentator().instrument(app).expose(app)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
