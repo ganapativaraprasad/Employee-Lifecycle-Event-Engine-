@@ -8,6 +8,7 @@ import {
 import './index.css'
 
 import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
 
 ReactDOM.createRoot(
   document.getElementById('root')!
@@ -16,9 +17,9 @@ ReactDOM.createRoot(
   <React.StrictMode>
 
     <BrowserRouter>
-
-      <App />
-
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </BrowserRouter>
 
   </React.StrictMode>

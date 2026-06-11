@@ -57,10 +57,14 @@ export const updateEmployee = async (employeeId: string, employeeData: any) => {
   return response.data
 }
 
-export const updateEmployeeStatus = async (employeeId: string, status: string) => {
+export const updateEmployeeStatus = async (
+  employeeId: string,
+  status: string,
+  reason: string = "Status updated from frontend"
+) => {
   const response = await api.post(
     `/employees/${employeeId}/transition`,
-    { new_state: status, reason: "Status updated from frontend" },
+    { new_state: status, reason },
     { headers: { Authorization: `Bearer ${getToken()}`, "Content-Type": "application/json" } }
   )
   return response.data

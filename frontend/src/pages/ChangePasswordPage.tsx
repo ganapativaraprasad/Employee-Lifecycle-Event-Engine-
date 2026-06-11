@@ -1,73 +1,38 @@
-import { useState } from "react"
-
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 import { changeMyPassword } from "../services/userService"
-import InlineNotice from "../components/InlineNotice"
+import { toast } from "sonner"
+
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+
+const ChangePasswordSchema = z.object({
+  current_password: z.string().min(1, "Current password is required"),
+  new_password: z.string().min(8, "New password must be at least 8 characters"),
+  confirm_password: z.string().min(1, "Confirm password is required"),
+}).superRefine(({ new_password, confirm_password }, ctx) => {
+  if (new_password !== confirm_password) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Passwords do not match", path: ["confirm_password"] })
+  }
+})
+
+type ChangePasswordForm = z.infer<typeof ChangePasswordSchema>
 
 function ChangePasswordPage() {
+  const { register, handleSubmit, formState: { errors, isSubmitting, isValid } } = useForm<ChangePasswordForm>({ resolver: zodResolver(ChangePasswordSchema), mode: "onBlur", defaultValues: { current_password: "", new_password: "", confirm_password: "" } })
 
-  const [currentPassword, setCurrentPassword] =
-    useState("")
-
-  const [newPassword, setNewPassword] =
-    useState("")
-
-  const [confirmPassword, setConfirmPassword] =
-    useState("")
-
-  const [loading, setLoading] =
-    useState(false)
-
-  const [error, setError] =
-    useState("")
-
-  const [success, setSuccess] =
-    useState("")
-
-  const passwordMeetsRule = (value: string) => {
-    return value.length >= 8
-  }
-
-  const handleChange = async () => {
-
-    if (newPassword !== confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-
+  const onSubmit = async (values: ChangePasswordForm) => {
     try {
-
-      setLoading(true)
-      setError("")
-      setSuccess("")
-
-      await changeMyPassword({
-        current_password: currentPassword,
-        new_password: newPassword
-      })
-
-      setCurrentPassword("")
-      setNewPassword("")
-      setConfirmPassword("")
-
-      setSuccess("Password updated")
-
-    } catch (error: any) {
-
-      console.log(error)
-
-      setError(
-        error?.response?.data?.detail ||
-        "Failed to change password"
-      )
-
-    } finally {
-
-      setLoading(false)
+      await changeMyPassword({ current_password: values.current_password, new_password: values.new_password })
+      toast.success("Password updated")
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || "Failed to change password"
+      toast.error(msg)
     }
   }
 
   return (
-
     <div className="animate-fade-in space-y-6">
 
       <div className="relative overflow-hidden rounded-3xl bg-linear-to-br from-slate-900 via-slate-800 to-slate-900 text-white p-8 shadow-lg">
@@ -80,57 +45,32 @@ function ChangePasswordPage() {
         </div>
       </div>
 
-      <InlineNotice message={error} variant="error" />
-
-      <InlineNotice message={success} variant="success" />
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl shadow-md p-6 lg:col-span-2">
           <h2 className="text-lg font-semibold text-gray-900">Update Password</h2>
           <p className="text-xs text-gray-500 mt-1">Choose a strong and unique password.</p>
 
-          <div className="space-y-4 mt-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-6">
             <div>
               <label className="text-xs text-gray-500">Current Password</label>
-              <input
-                type="password"
-                placeholder="Current password"
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-                className="w-full border border-gray-300 p-2.5 rounded-lg mt-2 text-sm"
-              />
+              <Input type="password" placeholder="Current password" {...register("current_password")} className="mt-2" />
+              {errors.current_password && <p className="text-sm text-red-600">{errors.current_password.message}</p>}
             </div>
 
             <div>
               <label className="text-xs text-gray-500">New Password</label>
-              <input
-                type="password"
-                placeholder="New password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="w-full border border-gray-300 p-2.5 rounded-lg mt-2 text-sm"
-              />
+              <Input type="password" placeholder="New password" {...register("new_password")} className="mt-2" />
+              {errors.new_password && <p className="text-sm text-red-600">{errors.new_password.message}</p>}
             </div>
 
             <div>
               <label className="text-xs text-gray-500">Confirm New Password</label>
-              <input
-                type="password"
-                placeholder="Confirm new password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full border border-gray-300 p-2.5 rounded-lg mt-2 text-sm"
-              />
+              <Input type="password" placeholder="Confirm new password" {...register("confirm_password")} className="mt-2" />
+              {errors.confirm_password && <p className="text-sm text-red-600">{errors.confirm_password.message}</p>}
             </div>
-          </div>
 
-          <button
-            onClick={handleChange}
-            disabled={loading}
-            className="mt-5 w-full bg-slate-900 hover:bg-slate-800 transition text-white text-sm px-4 py-2.5 rounded-lg shadow-md disabled:bg-slate-400"
-          >
-            {loading ? "Saving..." : "Update Password"}
-          </button>
+            <Button type="submit" className="mt-5 w-full" disabled={isSubmitting || !isValid}>{isSubmitting ? "Saving..." : "Update Password"}</Button>
+          </form>
         </div>
 
         <div className="bg-white rounded-2xl shadow-md p-6">
@@ -138,11 +78,7 @@ function ChangePasswordPage() {
           <p className="text-xs text-gray-500 mt-1">Aim for a stronger password.</p>
 
           <div className="mt-6 space-y-4">
-            <div className={`rounded-xl border p-3 ${
-              passwordMeetsRule(newPassword)
-                ? "border-emerald-200 bg-emerald-50"
-                : "border-slate-200 bg-slate-50"
-            }`}>
+            <div className={`rounded-xl border p-3 ${!errors.new_password ? "border-emerald-200 bg-emerald-50" : "border-slate-200 bg-slate-50"}`}>
               <p className="text-sm font-semibold text-gray-800">Minimum 8 characters</p>
               <p className="text-xs text-gray-500 mt-1">Longer is safer and easier to remember.</p>
             </div>

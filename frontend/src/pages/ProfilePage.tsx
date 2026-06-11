@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { toast } from "sonner"
 
-import {
-  getMyProfile,
-  updateMyProfile
-} from "../services/userService"
-import InlineNotice from "../components/InlineNotice"
+import { getMyProfile, updateMyProfile } from "../services/userService"
+
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
 
 type Profile = {
   id: string
@@ -19,17 +22,20 @@ function ProfilePage() {
   const [profile, setProfile] =
     useState<Profile | null>(null)
 
-  const [formData, setFormData] =
-    useState({ username: "", email: "" })
+  const [loading, setLoading] = useState(false)
 
-  const [loading, setLoading] =
-    useState(false)
+  const ProfileSchema = z.object({
+    username: z.string().min(1, "Username is required"),
+    email: z.string().email("Invalid email address"),
+  })
 
-  const [error, setError] =
-    useState("")
+  type ProfileForm = z.infer<typeof ProfileSchema>
 
-  const [success, setSuccess] =
-    useState("")
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting, isValid } } = useForm<ProfileForm>({
+    resolver: zodResolver(ProfileSchema),
+    defaultValues: { username: "", email: "" },
+    mode: "onBlur",
+  })
 
   const displayName = profile?.username || "User"
   const initials = displayName
@@ -45,22 +51,19 @@ function ProfilePage() {
     try {
 
       setLoading(true)
-      setError("")
 
       const data = await getMyProfile()
 
       setProfile(data)
 
-      setFormData({
-        username: data.username,
-        email: data.email
-      })
+      setValue("username", data.username)
+      setValue("email", data.email)
 
     } catch (error) {
 
       console.log(error)
-
-      setError("Failed to load profile")
+      const msg = "Failed to load profile"
+      toast.error(msg)
 
     } finally {
 
@@ -74,44 +77,20 @@ function ProfilePage() {
 
   }, [])
 
-  const handleUpdate = async () => {
-
+  const handleUpdate = async (values: ProfileForm) => {
     try {
-
       setLoading(true)
-      setError("")
-      setSuccess("")
 
-      const data = await updateMyProfile({
-        username: formData.username,
-        email: formData.email
-      })
-
+      const data = await updateMyProfile({ username: values.username, email: values.email })
       setProfile(data)
-
-      localStorage.setItem(
-        "username",
-        data.username
-      )
-
-      localStorage.setItem(
-        "user_email",
-        data.email
-      )
-
-      setSuccess("Profile updated")
-
+      localStorage.setItem("username", data.username)
+      localStorage.setItem("user_email", data.email)
+      toast.success("Profile updated")
     } catch (error: any) {
-
       console.log(error)
-
-      setError(
-        error?.response?.data?.detail ||
-        "Failed to update profile"
-      )
-
+      const msg = error?.response?.data?.detail || "Failed to update profile"
+      toast.error(msg)
     } finally {
-
       setLoading(false)
     }
   }
@@ -145,47 +124,26 @@ function ProfilePage() {
         </div>
       </div>
 
-      <InlineNotice message={error} variant="error" />
-      <InlineNotice message={success} variant="success" />
+      
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="bg-white rounded-2xl shadow-md p-6 lg:col-span-2">
           <h2 className="text-xl font-semibold text-gray-900">Profile Details</h2>
           <p className="text-sm text-gray-500 mt-1">Keep your info current for notifications.</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-            <div>
-              <label className="text-sm text-gray-500">Username</label>
-              <input
-                type="text"
-                placeholder="Username"
-                value={formData.username}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    username: e.target.value
-                  })
-                }
-                className="w-full border border-gray-300 p-3 rounded-xl mt-2"
-              />
+          <form onSubmit={handleSubmit(handleUpdate)}>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+              <div>
+                <label className="text-sm text-gray-500">Username</label>
+                <Input {...register("username")} className="mt-2" />
+                {errors.username && <p className="text-sm text-red-600">{errors.username.message}</p>}
+              </div>
+              <div>
+                <label className="text-sm text-gray-500">Email</label>
+                <Input {...register("email")} type="email" className="mt-2" />
+                {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
+              </div>
             </div>
-            <div>
-              <label className="text-sm text-gray-500">Email</label>
-              <input
-                type="email"
-                placeholder="Email"
-                value={formData.email}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    email: e.target.value
-                  })
-                }
-                className="w-full border border-gray-300 p-3 rounded-xl mt-2"
-              />
-            </div>
-          </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
             <div className="border border-gray-100 rounded-xl p-4">
               <p className="text-xs uppercase tracking-[0.2em] text-gray-400">Role</p>
@@ -199,13 +157,8 @@ function ProfilePage() {
             </div>
           </div>
 
-          <button
-            onClick={handleUpdate}
-            disabled={loading}
-            className="mt-6 w-full bg-slate-900 hover:bg-slate-800 transition text-white text-sm px-4 py-3 rounded-xl shadow-md disabled:bg-slate-400"
-          >
-            {loading ? "Saving..." : "Save Changes"}
-          </button>
+            <Button type="submit" className="mt-6 w-full" disabled={loading || isSubmitting || !isValid}>{loading || isSubmitting ? "Saving..." : "Save Changes"}</Button>
+          </form>
         </div>
 
         <div className="bg-white rounded-2xl shadow-md p-6">

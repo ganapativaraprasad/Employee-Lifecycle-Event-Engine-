@@ -1,7 +1,11 @@
 import { useState } from "react"
 
 import { loginUser, forgotPassword, resetPassword } from "../services/authService"
-import InlineNotice from "../components/InlineNotice"
+import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 
 function LoginPage() {
 
@@ -10,9 +14,6 @@ function LoginPage() {
   const [password, setPassword] = useState("")
 
   const [loading, setLoading] = useState(false)
-
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [forgotMode, setForgotMode] = useState(false)
   const [resetEmail, setResetEmail] = useState("")
   const [resetCode, setResetCode] = useState("")
@@ -24,7 +25,7 @@ function LoginPage() {
   const handleLogin = async () => {
     try {
       setLoading(true)
-      setError("")
+      
       const data = await loginUser(email, password)
       localStorage.setItem("access_token", data.access_token)
       localStorage.setItem("user_role", data.user.role)
@@ -32,7 +33,8 @@ function LoginPage() {
       localStorage.setItem("user_email", data.user.email)
       window.location.href = "/"
     } catch (error: any) {
-      setError("Invalid Credentials")
+      const msg = "Invalid Credentials"
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -41,11 +43,12 @@ function LoginPage() {
   const handleSendReset = async () => {
     try {
       setLoading(true)
-      setError("")
+      
       await forgotPassword(resetEmail)
       setStage("enterCode")
     } catch (err: any) {
-      setError("Failed to send reset code")
+      const msg = "Failed to send reset code"
+      toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -54,9 +57,10 @@ function LoginPage() {
   const handleReset = async () => {
     try {
       setLoading(true)
-      setError("")
+      
       if (newPassword.length < 6) {
-        setError("Password must be at least 6 characters")
+        const msg = "Password must be at least 6 characters"
+        toast.error(msg)
         setLoading(false)
         return
       }
@@ -66,11 +70,13 @@ function LoginPage() {
       setResetEmail("")
       setResetCode("")
       setNewPassword("")
-      setError("")
+      
       setLoading(false)
-      setSuccess("Password reset successful. Please log in.")
+      const msg2 = "Password reset successful. Please log in."
+      toast.success(msg2)
     } catch (err: any) {
-      setError(err?.response?.data?.detail || "Failed to reset password")
+      const msg = err?.response?.data?.detail || "Failed to reset password"
+      toast.error(msg)
       setLoading(false)
     }
   }
@@ -121,10 +127,15 @@ function LoginPage() {
           <div className="w-full max-w-md glass-card p-6 md:p-10">
             <div className="flex items-center justify-end">
               <div className="flex items-center gap-4">
-                <select value={language} onChange={(e) => setLanguage(e.target.value)} className="rounded-md border-gray-200 px-3 py-2 text-sm">
-                  <option>English</option>
-                  <option>Español</option>
-                </select>
+                <Select value={language} onValueChange={(v) => setLanguage(String(v))}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder={language} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="English">English</SelectItem>
+                    <SelectItem value="Español">Español</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -134,42 +145,41 @@ function LoginPage() {
             </div>
 
             <div className="mt-4">
-              <InlineNotice message={error} variant="error" />
-              <InlineNotice message={success} variant="success" />
+              
 
               {!forgotMode ? (
                 <div className="space-y-4 mt-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700">Email Address</label>
-                    <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" className="mt-2 w-full bg-slate-50 border border-transparent p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
+                    <Input type="email" value={email} onChange={(e: any) => setEmail(e.target.value)} placeholder="name@company.com" className="mt-2 w-full" />
                   </div>
 
                   <div>
                     <div className="flex items-center justify-between">
                       <label className="block text-sm font-medium text-slate-700">Password</label>
-                      <button onClick={() => { setForgotMode(true); setResetEmail(email || "") }} className="text-sm text-indigo-600 hover:underline">Forgot Password?</button>
+                      <Button variant="link" onClick={() => { setForgotMode(true); setResetEmail(email || "") }} className="text-sm">Forgot Password?</Button>
                     </div>
                     <div className="relative mt-2">
-                      <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" className="w-full bg-slate-50 border border-transparent p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 text-sm pr-12" />
-                      <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-3 text-sm text-slate-500">{showPassword ? 'Hide' : 'Show'}</button>
+                      <Input type={showPassword ? 'text' : 'password'} value={password} onChange={(e: any) => setPassword(e.target.value)} placeholder="Enter your password" className="w-full pr-12" />
+                      <Button variant="ghost" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-sm">{showPassword ? 'Hide' : 'Show'}</Button>
                     </div>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <label className="inline-flex items-center text-sm text-slate-600">
-                      <input type="checkbox" className="form-checkbox h-4 w-4 text-indigo-600" />
+                      <Checkbox />
                       <span className="ml-2">Remember me</span>
                     </label>
                   </div>
 
-                  <button onClick={handleLogin} disabled={loading} className="mt-2 w-full primary-btn px-4 py-3 text-sm font-semibold">{loading ? 'Signing in...' : 'Sign in'}</button>
+                  <Button onClick={handleLogin} disabled={loading} className="mt-2 w-full">{loading ? 'Signing in...' : 'Sign in'}</Button>
                 </div>
               ) : (
                 <div className="mt-4 space-y-4">
                   {stage === 'enterEmail' ? (
                     <>
                       <label className="block text-sm font-medium text-slate-700">Email to reset</label>
-                      <input type="email" placeholder="name@company.com" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} className="mt-2 w-full bg-slate-50 border border-transparent p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
+                      <Input type="email" placeholder="name@company.com" value={resetEmail} onChange={(e: any) => setResetEmail(e.target.value)} className="mt-2 w-full" />
                       <div className="flex gap-3">
                         <button onClick={handleSendReset} className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl transition font-semibold shadow">Send code</button>
                         <button onClick={() => { setForgotMode(false); setStage('enterEmail') }} className="mt-2 w-32 border border-gray-200 px-4 py-3 rounded-xl">Cancel</button>
@@ -178,9 +188,9 @@ function LoginPage() {
                   ) : (
                     <>
                       <label className="block text-sm font-medium text-slate-700">Enter code</label>
-                      <input type="text" placeholder="123456" value={resetCode} onChange={(e) => setResetCode(e.target.value)} className="mt-2 w-full bg-slate-50 border border-transparent p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
+                      <Input type="text" placeholder="123456" value={resetCode} onChange={(e: any) => setResetCode(e.target.value)} className="mt-2 w-full" />
                       <label className="block text-sm font-medium text-slate-700">New password</label>
-                      <input type="password" placeholder="New password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="mt-2 w-full bg-slate-50 border border-transparent p-3 rounded-xl outline-none focus:ring-2 focus:ring-indigo-400 text-sm" />
+                      <Input type="password" placeholder="New password" value={newPassword} onChange={(e: any) => setNewPassword(e.target.value)} className="mt-2 w-full" />
                       <div className="flex gap-3">
                         <button onClick={handleReset} className="mt-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-3 rounded-xl transition font-semibold shadow">Reset password</button>
                         <button onClick={() => { setForgotMode(false); setStage('enterEmail') }} className="mt-2 w-32 border border-gray-200 px-4 py-3 rounded-xl">Cancel</button>

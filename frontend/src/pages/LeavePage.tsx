@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
 
 import {
   applyLeave,
@@ -10,7 +13,13 @@ import {
 } from "../services/leaveService"
 import { listEmployees } from "../services/employeeService"
 import { listUsers } from "../services/userService"
-import InlineNotice from "../components/InlineNotice"
+import { toast } from "sonner"
+import LeaveDecisionForm from "@/components/leaves/LeaveDecisionForm"
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { Controller } from "react-hook-form"
 
 type LeaveItem = {
   id: string
@@ -82,25 +91,27 @@ function LeavePage() {
   const [loading, setLoading] =
     useState(false)
 
-  const [error, setError] =
-    useState("")
+  const LeaveSchema = z.object({
+    start_date: z.string().min(1, "Start date is required"),
+    end_date: z.string().min(1, "End date is required"),
+    reason: z.string().min(1, "Reason is required"),
+    leave_type: z.enum(["SICK", "PLANNED", "OPTIONAL", "LOP", "EARLY_LOGOUT"]),
+  })
 
-  const [success, setSuccess] =
-    useState("")
+  type LeaveFormValues = z.infer<typeof LeaveSchema>
 
-  const [formData, setFormData] =
-    useState({
+  const { register, handleSubmit, watch, reset, control, formState: { errors, isSubmitting } } = useForm<LeaveFormValues>({
+    resolver: zodResolver(LeaveSchema),
+    mode: "onBlur",
+    defaultValues: {
       start_date: "",
       end_date: "",
       reason: "",
-      leave_type: "SICK"
-    })
+      leave_type: "SICK",
+    },
+  })
 
-  const [decisionNotes, setDecisionNotes] =
-    useState<Record<string, string>>({})
-
-  const [rejectionErrors, setRejectionErrors] =
-    useState<Record<string, boolean>>({})
+  
 
   const canReview = useMemo(() =>
     isAdmin || isHr,
@@ -344,46 +355,39 @@ function LeavePage() {
 
   }, [isAdmin, isHr])
 
-  const handleApplyLeave = async () => {
-
+  const handleApplyLeave = async (data: any) => {
     try {
-
       setLoading(true)
-      setError("")
-      setSuccess("")
-
-      if (!formData.reason.trim()) {
-        setError("Reason is required.")
-        setLoading(false)
-        return
-      }
 
       const today = new Date()
       today.setHours(0, 0, 0, 0)
 
-      const startDate = new Date(formData.start_date)
-      const endDate = new Date(formData.end_date)
+      const startDate = new Date(data.start_date)
+      const endDate = new Date(data.end_date)
       startDate.setHours(0, 0, 0, 0)
       endDate.setHours(0, 0, 0, 0)
 
       if (startDate < today || endDate < today) {
-        setError("Leave dates must be today or later.")
+        const msg = "Leave dates must be today or later."
+        toast.error(msg)
         setLoading(false)
         return
       }
 
       if (endDate < startDate) {
-        setError("End date must be on or after the start date.")
+        const msg = "End date must be on or after the start date."
+        toast.error(msg)
         setLoading(false)
         return
       }
 
-      if (formData.leave_type === "PLANNED") {
+      if (data.leave_type === "PLANNED") {
         const minPlannedStart = new Date(today)
         minPlannedStart.setDate(minPlannedStart.getDate() + 7)
 
         if (startDate < minPlannedStart) {
-          setError("Planned leave must be applied at least 7 days in advance.")
+          const msg = "Planned leave must be applied at least 7 days in advance."
+          toast.error(msg)
           setLoading(false)
           return
         }
@@ -403,7 +407,8 @@ function LeavePage() {
       })
 
       if (hasOverlap) {
-        setError("You already have a leave request overlapping these dates.")
+        const msg = "You already have a leave request overlapping these dates."
+        toast.error(msg)
         setLoading(false)
         return
       }
@@ -411,34 +416,24 @@ function LeavePage() {
       const employeeIdToSend = currentEmployeeId || undefined
 
       await applyLeave({
-        ...formData,
+        ...data,
         ...(employeeIdToSend ? { employee_id: employeeIdToSend } : {})
       })
 
-      setFormData({
-        start_date: "",
-        end_date: "",
-        reason: "",
-        leave_type: "SICK"
-      })
+      reset()
 
       await fetchMyLeaves()
       await fetchTeamLeaves()
       await fetchStats()
 
-      setSuccess("Leave request submitted")
+      const successMsg = "Leave request submitted"
+      toast.success(successMsg)
 
     } catch (error: any) {
-
       console.log(error)
-
-      setError(
-        error?.response?.data?.detail ||
-        "Failed to apply leave"
-      )
-
+      const msg = error?.response?.data?.detail || "Failed to apply leave"
+      toast.error(msg)
     } finally {
-
       setLoading(false)
     }
   }
@@ -470,54 +465,31 @@ function LeavePage() {
 
   const handleDecision = async (
     leaveId: string,
-    decision: "approve" | "reject"
+    decision: "approve" | "reject",
+    note?: string
   ) => {
 
     try {
 
       setLoading(true)
-      setError("")
-      setSuccess("")
 
-      const note =
-        (decisionNotes[leaveId] || "").trim()
+      const noteValue = (note || "").trim()
 
-      if (decision === "reject" && !note) {
-        setRejectionErrors((previous) => ({
-          ...previous,
-          [leaveId]: true
-        }))
+      if (decision === "reject" && !noteValue) {
+        const msg = "Enter a rejection reason to continue."
+        toast.error(msg)
         setLoading(false)
         return
       }
 
       if (decision === "approve") {
-        await approveLeave(
-          leaveId,
-          { decision_note: note }
-        )
+        await approveLeave(leaveId, { decision_note: noteValue })
       } else {
-        await rejectLeave(
-          leaveId,
-          { decision_note: note }
-        )
+        await rejectLeave(leaveId, { decision_note: noteValue })
       }
 
-      setDecisionNotes((previous) => ({
-        ...previous,
-        [leaveId]: ""
-      }))
-
-      setRejectionErrors((previous) => ({
-        ...previous,
-        [leaveId]: false
-      }))
-
-      setSuccess(
-        decision === "approve"
-          ? "Leave request approved"
-          : "Leave request rejected"
-      )
+      const successMsg2 = decision === "approve" ? "Leave request approved" : "Leave request rejected"
+      toast.success(successMsg2)
 
       await fetchMyLeaves()
       await fetchTeamLeaves()
@@ -526,11 +498,8 @@ function LeavePage() {
     } catch (error: any) {
 
       console.log(error)
-
-      setError(
-        error?.response?.data?.detail ||
-        "Failed to update request"
-      )
+      const msg2 = error?.response?.data?.detail || "Failed to update request"
+      toast.error(msg2)
 
     } finally {
 
@@ -634,9 +603,7 @@ function LeavePage() {
         </div>
       )}
 
-      <InlineNotice message={error} variant="error" />
-
-      <InlineNotice message={success} variant="success" />
+      
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
@@ -645,72 +612,70 @@ function LeavePage() {
 
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Apply Leave</h2>
 
-            <div className="space-y-4">
+            <form onSubmit={handleSubmit(handleApplyLeave)} className="space-y-4">
+              <div>
+                <Input
+                  type="date"
+                  {...register("start_date")}
+                  min={
+                    (watch("leave_type") === "PLANNED")
+                      ? new Date(new Date().setDate(new Date().getDate() + 7)).toISOString().split("T")[0]
+                      : new Date().toISOString().split("T")[0]
+                  }
+                  className="w-full"
+                />
+                {errors.start_date && <p className="text-sm text-destructive mt-1">{(errors.start_date as any).message}</p>}
+              </div>
 
-              <input
-                type="date"
-                min={
-                  formData.leave_type === "PLANNED"
-                    ? new Date(
-                        new Date().setDate(
-                          new Date().getDate() + 7
-                        )
-                      )
-                        .toISOString()
-                        .split("T")[0]
-                    : new Date()
-                        .toISOString()
-                        .split("T")[0]
-                }
-                value={formData.start_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, start_date: e.target.value })
-                }
-                className="w-full border border-gray-300 p-3 rounded-xl"
-              />
-
-              <input
-                type="date"
-                min={formData.start_date || new Date().toISOString().split("T")[0]}
-                value={formData.end_date}
-                onChange={(e) =>
-                  setFormData({ ...formData, end_date: e.target.value })
-                }
-                className="w-full border border-gray-300 p-3 rounded-xl"
-              />
+              <div>
+                <Input
+                  type="date"
+                  {...register("end_date")}
+                  min={watch("start_date") || new Date().toISOString().split("T")[0]}
+                  className="w-full"
+                />
+                {errors.end_date && <p className="text-sm text-destructive mt-1">{(errors.end_date as any).message}</p>}
+              </div>
 
               <div>
                 <label className="text-sm text-gray-600">Leave Type</label>
-                <select
-                  value={(formData as any).leave_type}
-                  onChange={(e) => setFormData({ ...formData, leave_type: e.target.value })}
-                  className="w-full border border-gray-300 p-3 rounded-xl"
-                >
-                  <option value="SICK">Sick Leave</option>
-                  <option value="PLANNED">Planned Leave</option>
-                  <option value="OPTIONAL">Optional Holiday</option>
-                  <option value="LOP">Leave Without Pay (LOP)</option>
-                  <option value="EARLY_LOGOUT">Early Logout</option>
-                </select>
+                <Controller
+                  control={control}
+                  name="leave_type"
+                  render={({ field }) => (
+                    <Select onValueChange={(v) => field.onChange(v)} value={field.value}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="SICK">Sick Leave</SelectItem>
+                        <SelectItem value="PLANNED">Planned Leave</SelectItem>
+                        <SelectItem value="OPTIONAL">Optional Holiday</SelectItem>
+                        <SelectItem value="LOP">Leave Without Pay (LOP)</SelectItem>
+                        <SelectItem value="EARLY_LOGOUT">Early Logout</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
               </div>
 
-              <textarea
-                placeholder="Reason"
-                value={formData.reason}
-                onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                required
-                className="w-full border border-gray-300 p-3 rounded-xl min-h-30"
-              />
+              <div>
+                <Textarea
+                  placeholder="Reason"
+                  {...register("reason")}
+                  className="w-full"
+                />
+                {errors.reason && <p className="text-sm text-destructive mt-1">{(errors.reason as any).message}</p>}
+              </div>
 
-            </div>
-
-            <button
-              onClick={handleApplyLeave}
-              disabled={loading}
-              className="mt-6 w-full bg-blue-600 hover:bg-blue-700 transition text-white text-sm px-4 py-2 rounded-lg shadow-md disabled:bg-blue-300"
-            >
-              {loading ? "Submitting..." : "Submit Leave"}
-            </button>
+              <Button
+                type="submit"
+                disabled={loading || isSubmitting}
+                className="mt-6 w-full"
+              >
+                {loading || isSubmitting ? "Submitting..." : "Submit Leave"}
+              </Button>
+            </form>
 
           </div>
         ) : (
@@ -912,59 +877,7 @@ function LeavePage() {
 
                       <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
 
-                        <div className="flex-1">
-                          <input
-                            type="text"
-                            placeholder="Decision note (optional)"
-                            value={decisionNotes[leave.id] || ""}
-                            onChange={(e) =>
-                              setDecisionNotes((previous) => ({
-                                ...previous,
-                                [leave.id]: e.target.value
-                              }))
-                            }
-                            className="w-full border border-gray-300 p-3 rounded-xl"
-                          />
-                          {rejectionErrors[leave.id] && (
-                            <p className="text-xs text-red-500 mt-1">
-                              Enter a rejection reason to continue.
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex gap-3">
-
-                          <button
-                            onClick={() =>
-                              handleDecision(
-                                leave.id,
-                                "approve"
-                              )
-                            }
-                            disabled={loading}
-                            className="bg-green-600 hover:bg-green-700 transition text-white px-4 py-2 rounded-xl disabled:bg-green-300"
-                          >
-
-                            Approve
-
-                          </button>
-
-                          <button
-                            onClick={() =>
-                              handleDecision(
-                                leave.id,
-                                "reject"
-                              )
-                            }
-                            disabled={loading}
-                            className="bg-red-500 hover:bg-red-600 transition text-white px-4 py-2 rounded-xl disabled:bg-red-300"
-                          >
-
-                            Reject
-
-                          </button>
-
-                        </div>
+                        <LeaveDecisionForm leaveId={leave.id} onDecision={(id, decision, note) => handleDecision(id, decision, note)} disabled={loading} />
 
                       </div>
 
@@ -1058,59 +971,7 @@ function LeavePage() {
                           return (
                             <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
 
-                              <div className="flex-1">
-                                <input
-                                  type="text"
-                                  placeholder="Decision note (optional)"
-                                  value={decisionNotes[leave.id] || ""}
-                                  onChange={(e) =>
-                                    setDecisionNotes((previous) => ({
-                                      ...previous,
-                                      [leave.id]: e.target.value
-                                    }))
-                                  }
-                                  className="w-full border border-gray-300 p-3 rounded-xl"
-                                />
-                                {rejectionErrors[leave.id] && (
-                                  <p className="text-xs text-red-500 mt-1">
-                                    Enter a rejection reason to continue.
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="flex gap-3">
-
-                                <button
-                                  onClick={() =>
-                                    handleDecision(
-                                      leave.id,
-                                      "approve"
-                                    )
-                                  }
-                                  disabled={loading}
-                                  className="bg-green-600 hover:bg-green-700 transition text-white px-4 py-2 rounded-xl disabled:bg-green-300"
-                                >
-
-                                  Approve
-
-                                </button>
-
-                                <button
-                                  onClick={() =>
-                                    handleDecision(
-                                      leave.id,
-                                      "reject"
-                                    )
-                                  }
-                                  disabled={loading}
-                                  className="bg-red-500 hover:bg-red-600 transition text-white px-4 py-2 rounded-xl disabled:bg-red-300"
-                                >
-
-                                  Reject
-
-                                </button>
-
-                              </div>
+                              <LeaveDecisionForm leaveId={leave.id} onDecision={(id, decision, note) => handleDecision(id, decision, note)} disabled={loading} />
 
                             </div>
                           )

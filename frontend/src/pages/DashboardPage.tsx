@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react"
+import { PieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts"
 
 import {
   getDashboardStats
@@ -444,6 +445,53 @@ function DashboardPage() {
 
           </div>
 
+
+          {showAdminHrView && stats && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-sm font-semibold mb-4">Department Distribution</h3>
+                <div style={{ width: "100%", height: 240 }}>
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={departmentChart} dataKey="count" nameKey="department" outerRadius={80} label>
+                        {departmentChart.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <ReTooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-sm font-semibold mb-4">Employee States</h3>
+                <div style={{ width: "100%", height: 240 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={[{ name: 'Active', value: stats.active_employees }, { name: 'On Leave', value: stats.on_leave_employees }, { name: 'Suspended', value: stats.suspended_employees }, { name: 'Offboarded', value: stats.offboarded_employees }, { name: 'Onboarding', value: stats.onboarding_employees }]}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <ReTooltip />
+                      <Bar dataKey="value" fill="#0ea5e9" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <h3 className="text-sm font-semibold mb-4">Recent Activity</h3>
+                <div className="text-sm text-gray-600 max-h-56 overflow-y-auto">
+                  {stats.recent_activities.map((act) => (
+                    <div key={act.created_at} className="mb-3">
+                      <div className="font-medium">{act.action} — {act.actor_id}</div>
+                      <div className="text-xs text-gray-500">{act.created_at}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

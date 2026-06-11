@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 
-import InlineNotice from "../components/InlineNotice"
+import { toast } from "sonner"
+import { Input } from "@/components/ui/input"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 import {
   createHoliday,
   getCalendarEvents,
@@ -208,8 +210,6 @@ function CalendarPage() {
   const [selectedLeave, setSelectedLeave] = useState<LeaveEvent | null>(null)
 
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
-  const [success, setSuccess] = useState("")
   const [hasSeededDefaults, setHasSeededDefaults] = useState(false)
 
   const formatLocalDate = (date: Date) => {
@@ -242,7 +242,6 @@ function CalendarPage() {
   const fetchCalendarData = async () => {
     try {
       setLoading(true)
-      setError("")
 
       const [leaveResult, holidayResult] = await Promise.allSettled([
         getCalendarEvents(year),
@@ -261,14 +260,9 @@ function CalendarPage() {
 
       const hasHolidayData = holidayItems.length > 0 || year === 2026
 
-      if (leaveResult.status === "rejected" && holidayResult.status === "rejected") {
-        setError(
-          hasHolidayData
-            ? ""
-            : "Unable to load calendar data. Please try again."
-        )
-      } else if (hasHolidayData) {
-        setError("")
+        if (leaveResult.status === "rejected" && holidayResult.status === "rejected") {
+        const msg = hasHolidayData ? "" : "Unable to load calendar data. Please try again."
+        if (msg) toast.error(msg)
       }
 
       if (
@@ -293,7 +287,8 @@ function CalendarPage() {
 
           const seeded = await listHolidays(year)
           setHolidays(normalizeList(seeded))
-          setSuccess("Default holidays were added for 2026.")
+          const msg = "Default holidays were added for 2026."
+          toast.success(msg)
         } catch (seedError) {
           console.log(seedError)
         }
@@ -301,11 +296,8 @@ function CalendarPage() {
     } catch (err) {
       console.log(err)
       const fallbackHasHolidayData = year === 2026 || holidays.length > 0
-      setError(
-        fallbackHasHolidayData
-          ? ""
-          : "Unable to load calendar data. Please try again."
-      )
+      const msg = fallbackHasHolidayData ? "" : "Unable to load calendar data. Please try again."
+      if (msg) toast.error(msg)
     } finally {
       setLoading(false)
     }
@@ -315,14 +307,7 @@ function CalendarPage() {
     fetchCalendarData()
   }, [year])
 
-  useEffect(() => {
-    if (success) {
-      const timeout = setTimeout(() => setSuccess(""), 3000)
-      return () => clearTimeout(timeout)
-    }
-
-    return undefined
-  }, [success])
+ 
 
   const resolvedHolidays = useMemo(() => {
     if (holidays.length > 0) {
@@ -656,20 +641,21 @@ function CalendarPage() {
               >
                 &larr; {year - 1}
               </button>
-              <select
-                value={year}
-                onChange={(e) => setYear(Number(e.target.value))}
-                className="px-4 py-2 border rounded-lg"
-              >
-                {Array.from({ length: 5 }, (_, index) => {
-                  const currentYear = new Date().getFullYear() - 2 + index
-                  return (
-                    <option key={currentYear} value={currentYear}>
-                      {currentYear}
-                    </option>
-                  )
-                })}
-              </select>
+              <Select value={String(year)} onValueChange={(v) => setYear(Number(v))}>
+                <SelectTrigger className="px-4 py-2 border rounded-lg">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 5 }, (_, index) => {
+                    const currentYear = new Date().getFullYear() - 2 + index
+                    return (
+                      <SelectItem key={currentYear} value={String(currentYear)}>
+                        {currentYear}
+                      </SelectItem>
+                    )
+                  })}
+                </SelectContent>
+              </Select>
               <button
                 onClick={() => setYear((previous) => previous + 1)}
                 className="px-4 py-2 border rounded-lg"
@@ -701,12 +687,12 @@ function CalendarPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <input
+              <Input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search holidays, leaves, events"
-                className="border border-gray-300 p-2 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+                className="w-64"
               />
               <button
                 type="button"
@@ -767,8 +753,7 @@ function CalendarPage() {
         </div>
       </div>
 
-      {error && <InlineNotice message={error} variant="error" />}
-      {success && <InlineNotice message={success} variant="success" />}
+      
 
       {loading && (
         <div className="bg-white rounded-2xl shadow-sm p-4 text-sm text-gray-500">

@@ -1,11 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { toast } from "sonner"
 
-import {
-  createUser,
-  listUsers
-} from "../services/userService"
+import { createUser, listUsers } from "../services/userService"
 import { listEmployees } from "../services/employeeService"
-import InlineNotice from "../components/InlineNotice"
+ 
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select"
 
 type User = {
   id: string
@@ -20,12 +24,14 @@ type Employee = {
   email: string
 }
 
-const emptyForm = {
-  username: "",
-  email: "",
-  password: "",
-  role: "EMPLOYEE"
-}
+const UserSchema = z.object({
+  username: z.string().min(1, "Username is required"),
+  email: z.string().email("Invalid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  role: z.enum(["EMPLOYEE", "HR_MANAGER"]),
+})
+
+type UserFormValues = z.infer<typeof UserSchema>
 
 function UsersPage() {
 
@@ -50,11 +56,28 @@ function UsersPage() {
   const [success, setSuccess] =
     useState("")
 
-  const [formData, setFormData] =
-    useState(emptyForm)
+  useEffect(() => {
+    if (error) toast.error(error)
+  }, [error])
 
-  const [creating, setCreating] =
-    useState(false)
+  useEffect(() => {
+    if (success) toast.success(success)
+  }, [success])
+
+  const [creating, setCreating] = useState(false)
+
+  const { register, handleSubmit, reset, setValue, formState: { errors, isSubmitting, isValid } } = useForm<UserFormValues>({
+    resolver: zodResolver(UserSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      password: "",
+      role: "EMPLOYEE",
+    },
+    mode: "onBlur",
+  })
+
+  const [employeeFilter, setEmployeeFilter] = useState<string>("ALL")
 
   const canCreateRoles = useMemo(() => {
 
@@ -145,43 +168,27 @@ function UsersPage() {
 
   }, [employees, isAdmin, users])
 
-  const handleCreateUser = async () => {
-
+  const handleCreateUser = async (data: UserFormValues) => {
     try {
-
       setCreating(true)
       setError("")
       setSuccess("")
 
       await createUser({
-        ...formData,
-        role: isAdmin
-          ? formData.role
-          : "EMPLOYEE"
+        ...data,
+        role: isAdmin ? data.role : "EMPLOYEE",
       })
 
-      setFormData({
-        ...emptyForm,
-        role: isAdmin
-          ? formData.role
-          : "EMPLOYEE"
-      })
-
+      reset()
       await loadUsers()
-
+      toast.success("User created successfully")
       setSuccess("User created successfully")
-
     } catch (error: any) {
-
       console.log(error)
-
-      setError(
-        error?.response?.data?.detail ||
-        "Failed to create user"
-      )
-
+      const msg = error?.response?.data?.detail || "Failed to create user"
+      toast.error(msg)
+      setError(msg)
     } finally {
-
       setCreating(false)
     }
   }
@@ -210,9 +217,7 @@ function UsersPage() {
 
       </div>
 
-      <InlineNotice message={error} variant="error" />
-
-      <InlineNotice message={success} variant="success" />
+      {/* Inline notices replaced by Sonner toasts */}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
 
@@ -224,90 +229,34 @@ function UsersPage() {
 
           </h2>
 
-          <div className="space-y-4">
 
-            <input
-              type="text"
-              placeholder="Username"
-              value={formData.username}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  username: e.target.value
-                })
-              }
-              className="w-full border border-gray-300 p-3 rounded-xl"
-            />
+          <form onSubmit={handleSubmit(handleCreateUser)} className="space-y-4">
+            <Input {...register("username")} placeholder="Username" />
+            {errors.username && <p className="text-sm text-red-600">{errors.username.message}</p>}
 
-            <input
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  email: e.target.value
-                })
-              }
-              className="w-full border border-gray-300 p-3 rounded-xl"
-            />
+            <Input {...register("email")} type="email" placeholder="Email" />
+            {errors.email && <p className="text-sm text-red-600">{errors.email.message}</p>}
 
-            <input
-              type="password"
-              placeholder="Temporary password"
-              value={formData.password}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  password: e.target.value
-                })
-              }
-              className="w-full border border-gray-300 p-3 rounded-xl"
-            />
+            <Input {...register("password")} type="password" placeholder="Temporary password" />
+            {errors.password && <p className="text-sm text-red-600">{errors.password.message}</p>}
 
-            <select
-              value={formData.role}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  role: e.target.value
-                })
-              }
-              className="w-full border border-gray-300 p-3 rounded-xl"
-              disabled={!isAdmin}
-            >
-
-              {canCreateRoles.map((option) => (
-
-                <option key={option} value={option}>
-
-                  {option}
-
-                </option>
-              ))}
-
-            </select>
+            <Select defaultValue={"EMPLOYEE"} onValueChange={(v) => setValue("role", v as any)}>
+              <SelectTrigger className="w-full" disabled={!isAdmin}>
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                {canCreateRoles.map((option) => (
+                  <SelectItem key={option} value={option}>{option}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             {!isAdmin && (
-
-              <p className="text-xs text-gray-500">
-
-                HR can only create employee accounts.
-
-              </p>
+              <p className="text-xs text-gray-500">HR can only create employee accounts.</p>
             )}
 
-          </div>
-
-          <button
-            onClick={handleCreateUser}
-            disabled={creating}
-            className="mt-6 w-full bg-blue-600 hover:bg-blue-700 transition text-white text-sm px-4 py-2 rounded-lg shadow-md disabled:bg-blue-300"
-          >
-
-            {creating ? "Creating..." : "Create Account"}
-
-          </button>
+            <Button type="submit" className="mt-6 w-full" disabled={creating || isSubmitting || !isValid}>{creating || isSubmitting ? "Creating..." : "Create Account"}</Button>
+          </form>
 
         </div>
 
@@ -320,6 +269,19 @@ function UsersPage() {
               Existing Users
 
             </h2>
+            <div>
+              <Select value={employeeFilter} onValueChange={(v) => setEmployeeFilter(String(v))}>
+                <SelectTrigger className="w-56">
+                  <SelectValue placeholder="All employees" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All employees</SelectItem>
+                  {employees.map((emp) => (
+                    <SelectItem key={emp.id} value={emp.email}>{emp.email}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
             {!isAdmin && (
 

@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { Toaster } from "@/components/ui/sonner"
 
 import {
   FaTachometerAlt,
@@ -311,6 +312,7 @@ function MainLayout({
           {children}
 
         </div>
+        <Toaster />
 
       </div>
 
