@@ -53,19 +53,19 @@ export default function EmployeeTransitionDialog({
 
     try {
       // optimistic update
-      onOptimistic && onOptimistic(selectedState)
+      onOptimistic?.(selectedState)
       setLoading(true)
       await updateEmployeeStatus(employeeId, selectedState, reason)
       toast.success("State transitioned successfully")
       onOpenChange(false)
       setSelectedState("")
       setReason("")
-      onSuccess && onSuccess()
+      onSuccess?.()
     } catch (e) {
       console.error(e)
       toast.error("Failed to transition state")
       // allow parent to revert optimistic update
-      onError && onError()
+      onError?.()
     } finally {
       setLoading(false)
     }

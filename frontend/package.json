@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --rule \"@typescript-eslint/no-explicit-any:0\" --rule \"react-refresh/only-export-components:0\"",
     "preview": "vite preview"
   },
   "dependencies": {

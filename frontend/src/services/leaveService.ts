@@ -169,3 +169,33 @@ export const getLeaveStats = async () => {
 
   return response.data
 }
+
+export const getPendingLeaves = async (
+  query: LeaveQuery
+) => {
+
+  const params = new URLSearchParams()
+
+  Object.entries(query).forEach(
+    ([key, value]) => {
+
+      if (value !== undefined && value !== "") {
+        params.append(key, String(value))
+      }
+    }
+  )
+
+  const response = await api.get(
+
+    `/leaves/pending?${params.toString()}`,
+
+    {
+      headers: {
+        Authorization:
+          `Bearer ${getToken()}`
+      }
+    }
+  )
+
+  return response.data
+}

@@ -413,6 +413,13 @@ async def reject_leave(
             detail="Only admin can reject HR manager leave requests"
         )
 
+    # Rejection must include a decision note
+    if not getattr(payload, 'decision_note', None) or not (str(payload.decision_note).strip()):
+        raise HTTPException(
+            status_code=400,
+            detail="Decision note is required when rejecting a leave request"
+        )
+
     leave.status = LeaveStatus.REJECTED
     leave.approved_by = str(current_user.id)
     leave.approved_at = datetime.utcnow()
@@ -436,6 +443,73 @@ async def reject_leave(
         approved_at=leave.approved_at,
         decision_note=leave.decision_note,
         created_at=leave.created_at
+    )
+
+
+
+@router.get("/pending", response_model=LeaveListResponseSchema)
+async def list_pending_leaves(
+    page: int = 1,
+    limit: int = 10,
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
+) -> LeaveListResponseSchema:
+
+    skip = (page - 1) * limit
+
+    # Fetch all pending leaves then filter according to approver hierarchy
+    pending_all = await LeaveRequest.find(LeaveRequest.status == LeaveStatus.PENDING).sort("-created_at").to_list()
+
+    filtered: list[LeaveRequest] = []
+
+    for leave in pending_all:
+        target_user = await User.find_one(User.email == leave.employee_email)
+        target_role = getattr(target_user, 'role', None) if target_user else None
+
+        # HR managers should approve employee leaves (not HR manager leaves)
+        if current_user.role == UserRole.HR_MANAGER:
+            if target_role == UserRole.HR_MANAGER:
+                continue
+            filtered.append(leave)
+            continue
+
+        # Admins should approve HR manager leaves
+        if current_user.role == UserRole.ADMIN:
+            if target_role == UserRole.HR_MANAGER:
+                filtered.append(leave)
+            continue
+
+    total = len(filtered)
+
+    page_items = filtered[skip: skip + limit]
+
+    return LeaveListResponseSchema(
+        items=[
+            LeaveResponseSchema(
+                id=str(leave.id),
+                employee_id=leave.employee_id,
+                employee_email=leave.employee_email,
+                employee_name=leave.employee_name,
+                start_date=leave.start_date,
+                end_date=leave.end_date,
+                reason=leave.reason,
+                leave_type=leave.leave_type,
+                status=leave.status,
+                requested_by=leave.requested_by,
+                approved_by=leave.approved_by,
+                approved_at=leave.approved_at,
+                decision_note=leave.decision_note,
+                created_at=leave.created_at
+            )
+            for leave in page_items
+        ],
+        total=total,
+        page=page,
+        limit=limit
     )
 
 

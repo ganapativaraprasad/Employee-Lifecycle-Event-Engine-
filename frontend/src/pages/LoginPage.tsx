@@ -32,7 +32,7 @@ function LoginPage() {
       localStorage.setItem("username", data.user.username)
       localStorage.setItem("user_email", data.user.email)
       window.location.href = "/"
-    } catch (error: any) {
+    } catch {
       const msg = "Invalid Credentials"
       toast.error(msg)
     } finally {
@@ -46,7 +46,7 @@ function LoginPage() {
       
       await forgotPassword(resetEmail)
       setStage("enterCode")
-    } catch (err: any) {
+    } catch {
       const msg = "Failed to send reset code"
       toast.error(msg)
     } finally {

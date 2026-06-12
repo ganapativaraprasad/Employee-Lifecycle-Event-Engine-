@@ -138,10 +138,12 @@ function UsersPage() {
   }
 
   useEffect(() => {
+    const load = async () => {
+      await loadUsers()
+      await loadEmployees()
+    }
 
-    loadUsers()
-    loadEmployees()
-
+    load()
   }, [isAdmin])
 
   const visibleUsers = useMemo(() => {

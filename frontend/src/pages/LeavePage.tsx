@@ -9,7 +9,8 @@ import {
   getLeaveStats,
   listLeaves,
   listMyLeaves,
-  rejectLeave
+  rejectLeave,
+  getPendingLeaves
 } from "../services/leaveService"
 import { listEmployees } from "../services/employeeService"
 import { listUsers } from "../services/userService"
@@ -72,6 +73,7 @@ function LeavePage() {
 
   const isAdmin = role === "ADMIN"
   const isHr = role === "HR_MANAGER"
+  
 
   const [myLeaves, setMyLeaves] =
     useState<LeaveItem[]>([])
@@ -84,6 +86,8 @@ function LeavePage() {
 
   const [teamLeaves, setTeamLeaves] =
     useState<LeaveItem[]>([])
+
+  const [serverPendingLeaves, setServerPendingLeaves] = useState<LeaveItem[]>([])
 
   const [stats, setStats] =
     useState({ pending: 0, approved: 0, rejected: 0 })
@@ -187,11 +191,76 @@ function LeavePage() {
         if (dept.includes("human") && dept.includes("resourc") || desig.includes("hr") || desig.includes("human resources")) {
           map[email] = "HR_MANAGER"
         }
-      } catch (err) {}
+      } catch {
+        /* ignore */
+      }
     })
 
     return map
   }, [users, employees])
+
+  const visibleTeamLeaves = useMemo(() => {
+    // Legacy complex role filters removed. Keep this hook for compatibility
+    // but return the raw team leaves by default. Use explicit hr/admin
+    // pending lists (based on allLeaves) for approval rendering.
+    if (!canReview) return [] as LeaveItem[]
+    return teamLeaves
+  }, [teamLeaves, isAdmin, canReview, userRoleByEmail, employees])
+
+  // HR pending approvals: all leaves with status PENDING
+  const hrPendingLeaves = useMemo(() => {
+    if (!isHr) return [] as LeaveItem[]
+    if (serverPendingLeaves && serverPendingLeaves.length > 0) return serverPendingLeaves
+    // Use union of allLeaves and teamLeaves to avoid missing items due to backend differences
+    const combined = [...(allLeaves || []), ...(teamLeaves || [])]
+    const map: Record<string, LeaveItem> = {}
+    combined.forEach((l) => {
+      if (!l || !l.id) return
+      map[l.id] = l
+    })
+
+    return Object.values(map).filter((leave) => {
+      if ((leave.status || "").toUpperCase() !== "PENDING") return false
+
+      const email = (leave.employee_email || leave.requested_by || "").toLowerCase()
+
+      // Exclude own requests (by email when available)
+      if (email === userEmail) return false
+
+      // If the requester is explicitly mapped to HR or ADMIN via users map, exclude
+      const roleFor = (userRoleByEmail[email] || "").toUpperCase()
+      if (roleFor === "HR_MANAGER" || roleFor === "ADMIN") return false
+
+      // Try to find the requester in employees. If found and is HR, exclude.
+      const requester = employees.find((e) => (e.id === leave.employee_id) || ((e.email || "").toLowerCase() === email))
+      if (requester) {
+        const dept = (requester.department || "").toLowerCase()
+        const desig = (requester.designation || "").toLowerCase()
+        if (dept.includes("human") || desig.includes("hr") || desig.includes("human resources")) {
+          return false
+        }
+        return true
+      }
+
+      // Fallback: requester not found in employees. Assume it's an employee unless role map marks it HR/ADMIN.
+      return true
+    })
+  }, [allLeaves, teamLeaves, isHr, employees, userEmail, serverPendingLeaves])
+
+  // Admin pending leaves: all leaves with status PENDING
+  const adminPendingLeaves = useMemo(() => {
+    if (!isAdmin) return [] as LeaveItem[]
+    // Prefer server-provided pending list when available
+    if (serverPendingLeaves && serverPendingLeaves.length > 0) return serverPendingLeaves
+    const combined = [...(allLeaves || []), ...(teamLeaves || [])]
+    const map: Record<string, LeaveItem> = {}
+    combined.forEach((l) => {
+      if (!l || !l.id) return
+      map[l.id] = l
+    })
+
+    return Object.values(map).filter((leave) => (leave.status || "").toUpperCase() === "PENDING")
+  }, [allLeaves, teamLeaves, isAdmin, serverPendingLeaves])
 
   const upcomingLeaves = useMemo(() => {
     if (!isAdmin) {
@@ -203,9 +272,9 @@ function LeavePage() {
 
     return allLeaves
       .filter((leave) => {
-        if (leave.status !== "APPROVED") {
-          return false
-        }
+        if ((leave.status || "").toUpperCase() !== "APPROVED") {
+              return false
+            }
 
         const start = new Date(leave.start_date)
         start.setHours(0, 0, 0, 0)
@@ -228,7 +297,7 @@ function LeavePage() {
 
     return allLeaves
       .filter((leave) => {
-        if (leave.status !== "PENDING") {
+        if ((leave.status || "").toUpperCase() !== "PENDING") {
           return false
         }
 
@@ -262,32 +331,35 @@ function LeavePage() {
   }
 
   const fetchTeamLeaves = async () => {
-
-    if (!canReview) {
-      return
-    }
-
     try {
 
-      const data: LeaveListResponse =
-        await listLeaves({
-          page: 1,
-          limit: 10,
-          status: "PENDING"
-        })
-
-      setTeamLeaves(data.items)
+      const data = await listLeaves({
+        page: 1,
+        limit: 1000
+      })
+      setTeamLeaves(data.items || [])
 
     } catch (error) {
 
-      console.log(error)
+      console.error("TEAM ERROR")
+      console.error(error)
+
     }
   }
 
   const fetchAllLeaves = async () => {
     try {
       const data: LeaveListResponse = await listLeaves({ page: 1, limit: 1000 })
-      setAllLeaves(data.items)
+      setAllLeaves(data.items || [])
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const fetchPendingLeaves = async () => {
+    try {
+      const data: LeaveListResponse = await getPendingLeaves({ page: 1, limit: 1000 })
+      setServerPendingLeaves(data.items || [])
     } catch (err) {
       console.error(err)
     }
@@ -346,6 +418,7 @@ function LeavePage() {
 
     fetchAllLeaves()
     fetchEmployees()
+    fetchPendingLeaves()
 
     // Fetch user list only for admins (endpoint is admin-only). HR will
     // instead be able to infer HR-manager emails from the `employees` list.
@@ -457,7 +530,9 @@ function LeavePage() {
           const diff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1
           const key = (l as any).leave_type || 'SICK'
           map[key] = (map[key] || 0) + diff
-        } catch (err) {}
+        } catch {
+          /* ignore */
+        }
       })
 
       return map
@@ -476,11 +551,12 @@ function LeavePage() {
       const noteValue = (note || "").trim()
 
       if (decision === "reject" && !noteValue) {
-        const msg = "Enter a rejection reason to continue."
+        const msg = "Rejection reason is required"
         toast.error(msg)
         setLoading(false)
         return
       }
+
 
       if (decision === "approve") {
         await approveLeave(leaveId, { decision_note: noteValue })
@@ -491,9 +567,12 @@ function LeavePage() {
       const successMsg2 = decision === "approve" ? "Leave request approved" : "Leave request rejected"
       toast.success(successMsg2)
 
-      await fetchMyLeaves()
-      await fetchTeamLeaves()
-      await fetchStats()
+    // Refresh data to reflect the updated approval state
+    await fetchAllLeaves()
+    await fetchTeamLeaves()
+    await fetchMyLeaves()
+    await fetchStats()
+    await fetchPendingLeaves()
 
     } catch (error: any) {
 
@@ -506,6 +585,8 @@ function LeavePage() {
       setLoading(false)
     }
   }
+
+  
 
   return (
 
@@ -576,7 +657,7 @@ function LeavePage() {
           <div className="bg-linear-to-r from-violet-600 to-indigo-600 text-white rounded-2xl p-6 shadow-md">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm uppercase tracking-wider">Total Leave Balance</div>
+                <div className="text-sm uppercase tracking-wider">Total Leaves Used</div>
                 <div className="text-3xl font-semibold mt-2">{Object.values(balances).reduce((a,b)=>a+(b||0),0)} days</div>
               </div>
 
@@ -778,7 +859,7 @@ function LeavePage() {
 
                         </div>
 
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${leave.status === "APPROVED" ? "bg-green-100 text-green-700" : leave.status === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
+                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${(leave.status || "").toUpperCase() === "APPROVED" ? "bg-green-100 text-green-700" : (leave.status || "").toUpperCase() === "REJECTED" ? "bg-red-100 text-red-700" : "bg-yellow-100 text-yellow-700"}`}>
 
                           {leave.status}
 
@@ -823,166 +904,74 @@ function LeavePage() {
 
               </div>
 
-              {pendingLeaves.length === 0 && (
-
-                <div className="text-sm text-gray-500">
-
-                  No pending leaves from today onward.
-
-                </div>
-              )}
-
-              {pendingLeaves.length > 0 && (
-
+              {adminPendingLeaves.length === 0 ? (
+                <div className="text-sm text-gray-500">No pending leaves from today onward.</div>
+              ) : (
                 <div className="space-y-4">
-
-                  {pendingLeaves.map((leave) => (
-
-                    <div
-                      key={leave.id}
-                      className="border border-gray-100 rounded-xl p-4"
-                    >
-
+                  {adminPendingLeaves.map((leave) => (
+                    <div key={leave.id} className="border border-gray-100 rounded-xl p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
-
                         <div>
-
                           <p className="font-medium text-gray-800">
-
-                            {leave.employee_name} ({leave.employee_email})
-
+                            {leave.employee_name} ({leave.employee_email || leave.requested_by})
                           </p>
-
                           <p className="text-sm text-gray-500">
-
-                            {leave.start_date} to {leave.end_date}
-
+                            {leave.leave_type || ""} — {leave.start_date} to {leave.end_date}
                           </p>
-
-                          <p className="text-sm text-gray-500">
-
-                            {leave.reason}
-
-                          </p>
-
+                          <p className="text-sm text-gray-500">{leave.reason}</p>
                         </div>
-
-                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
-
-                          {leave.status}
-
-                        </span>
-
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">{leave.status}</span>
                       </div>
 
                       <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
-
                         <LeaveDecisionForm leaveId={leave.id} onDecision={(id, decision, note) => handleDecision(id, decision, note)} disabled={loading} />
-
                       </div>
-
                     </div>
                   ))}
-
                 </div>
               )}
 
             </div>
-          ) : (
+            ) : (
             canReview && (
-
               <div className="bg-white rounded-2xl shadow-md p-6">
-
                 <div className="flex items-center justify-between mb-4">
-
-                  <h2 className="text-xl font-semibold text-gray-800">
-
-                    Pending Approvals
-
-                  </h2>
-
-                  <span className="text-sm text-gray-500">
-
-                    Latest 10 requests
-
-                  </span>
-
+                  <h2 className="text-xl font-semibold text-gray-800">Pending Approvals</h2>
+                  <span className="text-sm text-gray-500">Latest 10 requests</span>
                 </div>
 
-                {teamLeaves.length === 0 && (
-
-                  <div className="text-sm text-gray-500">
-
-                    No pending requests.
-
-                  </div>
-                )}
-
-                {teamLeaves.length > 0 && (
-
+                {hrPendingLeaves.length === 0 ? (
+                  <div className="text-sm text-gray-500">No pending requests.</div>
+                ) : (
                   <div className="space-y-4">
+                    {hrPendingLeaves.map((leave) => {
+                      const requesterEmail = (leave.employee_email || leave.requested_by || "").toLowerCase()
+                      const isOwn = requesterEmail === userEmail
+                      const requesterRole = (userRoleByEmail[requesterEmail] || "").toUpperCase()
+                      const canHrDecide = isHr && !isOwn && requesterRole !== "ADMIN"
 
-                    {teamLeaves.map((leave) => (
-
-                      <div
-                        key={leave.id}
-                        className="border border-gray-100 rounded-xl p-4"
-                      >
-
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-
-                          <div>
-
-                            <p className="font-medium text-gray-800">
-
-                              {leave.employee_name} ({leave.employee_email})
-
-                            </p>
-
-                            <p className="text-sm text-gray-500">
-
-                              {leave.start_date} to {leave.end_date}
-
-                            </p>
-
-                            <p className="text-sm text-gray-500">
-
-                              {leave.reason}
-
-                            </p>
-
+                      return (
+                        <div key={leave.id} className="border border-gray-100 rounded-xl p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                              <p className="font-medium text-gray-800">{leave.employee_name} ({leave.employee_email || leave.requested_by})</p>
+                              <p className="text-sm text-gray-500">{leave.leave_type || ""} — {leave.start_date} to {leave.end_date}</p>
+                              <p className="text-sm text-gray-500">{leave.reason}</p>
+                            </div>
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">{leave.status}</span>
                           </div>
 
-                          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700">
-
-                            {leave.status}
-
-                          </span>
+                          {canHrDecide && (
+                            <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
+                              <LeaveDecisionForm leaveId={leave.id} onDecision={(id, decision, note) => handleDecision(id, decision, note)} disabled={loading} />
+                            </div>
+                          )}
 
                         </div>
-
-                        {(() => {
-                          const targetRole = userRoleByEmail[leave.employee_email?.toLowerCase() || ""] || ""
-                          const hideDecisionForHr = isHr && targetRole === "HR_MANAGER"
-                          if (hideDecisionForHr) {
-                            return null
-                          }
-
-                          return (
-                            <div className="mt-4 flex flex-col md:flex-row md:items-center gap-3">
-
-                              <LeaveDecisionForm leaveId={leave.id} onDecision={(id, decision, note) => handleDecision(id, decision, note)} disabled={loading} />
-
-                            </div>
-                          )
-                        })()}
-
-                      </div>
-                    ))}
-
+                      )
+                    })}
                   </div>
                 )}
-
               </div>
             )
           )}

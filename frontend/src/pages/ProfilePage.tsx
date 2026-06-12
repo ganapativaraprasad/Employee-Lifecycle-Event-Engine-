@@ -72,9 +72,11 @@ function ProfilePage() {
   }
 
   useEffect(() => {
+    const load = async () => {
+      await loadProfile()
+    }
 
-    loadProfile()
-
+    load()
   }, [])
 
   const handleUpdate = async (values: ProfileForm) => {

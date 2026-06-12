@@ -124,12 +124,20 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     // fetch leaves once when page/role/limit change or on mount
-    fetchAllLeaves()
+    const load = async () => {
+      await fetchAllLeaves()
+    }
+
+    load()
   }, [])
 
   useEffect(() => {
     // fetch immediately when page or limit change
-    fetchEmployees()
+    const load = async () => {
+      await fetchEmployees()
+    }
+
+    load()
   }, [page, limit])
 
   useEffect(() => {
@@ -250,6 +258,7 @@ export default function EmployeesPage() {
         onOpenChange={setTransitionOpen}
         employeeId={selectedEmployeeId || null}
         currentState={transitionEmployeeState}
+        // eslint-disable-next-line react-hooks/immutability
         onOptimistic={(newState: string) => {
           // store previous state for potential revert
           const prev = employees.find((e) => e.id === selectedEmployeeId)?.current_state

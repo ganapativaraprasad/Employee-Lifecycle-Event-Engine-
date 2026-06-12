@@ -1,5 +1,6 @@
 import { useForm } from "react-hook-form"
 import { useState } from "react"
+import { toast } from "sonner"
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,7 @@ export default function LeaveDecisionForm({ leaveId, onDecision, disabled }: Pro
   const { register, getValues } = useForm<{ decision_note: string }>({ defaultValues: { decision_note: "" } })
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState("")
+  const [error, setError] = useState("")
 
   const submitApprove = () => {
     const note = getValues().decision_note || undefined
@@ -23,12 +25,16 @@ export default function LeaveDecisionForm({ leaveId, onDecision, disabled }: Pro
 
   const openRejectDialog = () => {
     setReason( (getValues().decision_note) || "" )
+    setError("")
     setOpen(true)
   }
 
   const confirmReject = () => {
     const note = (reason || "").trim()
-    if (!note) return
+    if (!note) {
+      setError("Rejection reason is required")
+      return
+    }
     onDecision(leaveId, "reject", note)
     setOpen(false)
   }
@@ -56,11 +62,12 @@ export default function LeaveDecisionForm({ leaveId, onDecision, disabled }: Pro
         <DialogContent>
           <h3 className="text-lg font-semibold mb-4">Reject Leave</h3>
           <div>
-            <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Enter rejection reason" className="min-h-30" />
+              <Textarea value={reason} onChange={(e) => { setReason(e.target.value); if (error) setError("") }} placeholder="Enter rejection reason" className="min-h-30" />
+              {error && <p className="text-sm text-destructive mt-2">{error}</p>}
           </div>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={confirmReject}>Confirm Reject</Button>
+              <Button variant="destructive" onClick={confirmReject} disabled={(reason || "").trim() === ""}>Confirm Reject</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

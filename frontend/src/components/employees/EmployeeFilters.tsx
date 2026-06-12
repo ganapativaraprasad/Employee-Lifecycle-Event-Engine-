@@ -47,7 +47,7 @@ export default function EmployeeFilters({ filters, setFilters, applyFilters, cle
         if (!mounted) return
         setDepartments(Array.from(deptSet).sort())
         setStates(Array.from(stateSet).sort())
-      } catch (err) {
+      } catch {
         // ignore - fall back to defaults already present
       }
     }
@@ -112,23 +112,13 @@ export default function EmployeeFilters({ filters, setFilters, applyFilters, cle
             <SelectValue placeholder="Employment Status" />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="HIRED">Hired</SelectItem>
+            <SelectItem value="ONBOARDING">Onboarding</SelectItem>
             <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="ON_LEAVE">On Leave</SelectItem>
+            <SelectItem value="TRANSFERRED">Transferred</SelectItem>
             <SelectItem value="SUSPENDED">Suspended</SelectItem>
             <SelectItem value="OFFBOARDED">Offboarded</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={filters.current_state} onValueChange={(value) => setFilters({ ...filters, current_state: value === "__ANY__" ? "" : value })}>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="FSM State" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__ANY__">Any</SelectItem>
-            {states.length > 0 ? states.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>) : (
-              ["HIRED","ONBOARDING","ACTIVE","ON_LEAVE","TRANSFERRED","SUSPENDED","OFFBOARDED"].map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
-              ))
-            )}
           </SelectContent>
         </Select>
 

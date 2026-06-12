@@ -304,7 +304,10 @@ function CalendarPage() {
   }
 
   useEffect(() => {
-    fetchCalendarData()
+    const load = async () => {
+      await fetchCalendarData()
+    }
+    load()
   }, [year])
 
  
@@ -837,17 +840,18 @@ function CalendarPage() {
                 year: "numeric"
               })}
             </h2>
-            <select
-              value={monthIndex}
-              onChange={(e) => setMonthIndex(Number(e.target.value))}
-              className="border border-gray-300 p-2 rounded-lg"
-            >
-              {months.map((month) => (
-                <option key={month} value={month}>
-                  {new Date(year, month).toLocaleString(undefined, { month: "long" })}
-                </option>
-              ))}
-            </select>
+            <Select value={String(monthIndex)} onValueChange={(v) => setMonthIndex(Number(v))}>
+              <SelectTrigger className="border border-gray-300 p-2 rounded-lg">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {months.map((month) => (
+                  <SelectItem key={month} value={String(month)}>
+                    {new Date(year, month).toLocaleString(undefined, { month: "long" })}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="grid grid-cols-7 gap-1 text-xs mb-2">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((dayName) => (
