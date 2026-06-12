@@ -832,7 +832,7 @@ function LeavePage() {
 
               {myLeaves.length > 0 && (
 
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
 
                   {myLeaves.map((leave) => (
 
@@ -885,14 +885,14 @@ function LeavePage() {
             </div>
           )}
 
-          {isAdmin ? (
+              {isAdmin ? (
             <div className="bg-white rounded-2xl shadow-md p-6">
 
               <div className="flex items-center justify-between mb-4">
 
                 <h2 className="text-xl font-semibold text-gray-800">
 
-                  Pending Leaves
+                  Pending Approvals
 
                 </h2>
 
@@ -907,7 +907,7 @@ function LeavePage() {
               {adminPendingLeaves.length === 0 ? (
                 <div className="text-sm text-gray-500">No pending leaves from today onward.</div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
                   {adminPendingLeaves.map((leave) => (
                     <div key={leave.id} className="border border-gray-100 rounded-xl p-4">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -943,7 +943,7 @@ function LeavePage() {
                 {hrPendingLeaves.length === 0 ? (
                   <div className="text-sm text-gray-500">No pending requests.</div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
                     {hrPendingLeaves.map((leave) => {
                       const requesterEmail = (leave.employee_email || leave.requested_by || "").toLowerCase()
                       const isOwn = requesterEmail === userEmail
