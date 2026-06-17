@@ -27,6 +27,9 @@ from app.exceptions.exception_handlers import (
 from app.api.routes.dashboard_routes import (
     router as dashboard_router
 )
+from app.api.routes.activity_routes import (
+    router as activity_router
+)
 from app.api.routes.user_routes import (
     router as user_router
 )
@@ -87,6 +90,11 @@ app.add_exception_handler(
 
 app.include_router(
     dashboard_router,
+    prefix="/api/v1"
+)
+
+app.include_router(
+    activity_router,
     prefix="/api/v1"
 )
 

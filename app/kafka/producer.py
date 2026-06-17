@@ -1,24 +1,32 @@
 import json
 import asyncio
 import logging
-from typing import Optional, TYPE_CHECKING, Any, cast
-
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from aiokafka import AIOKafkaProducer  # type: ignore[import-untyped]
+from typing import Optional, Any, cast
 
 logger = logging.getLogger(__name__)
 
-producer: Optional["AIOKafkaProducer"] = None
+# Producer may be an aiokafka AIOKafkaProducer instance when available
+producer: Optional[Any] = None
 
 
 async def start_producer() -> None:
-    """Initialize a singleton AIOKafkaProducer with retry and structured logging."""
+    """Initialize a singleton AIOKafkaProducer with retry and structured logging.
+
+    If Kafka is unreachable after retries, leave `producer` as None and continue.
+    """
     global producer
 
-    producer = AIOKafkaProducer(
-        bootstrap_servers="kafka:9092",
-        value_serializer=lambda v: json.dumps(v).encode()
-    )
+    try:
+        from aiokafka import AIOKafkaProducer  # imported at runtime
+
+        producer = AIOKafkaProducer(
+            bootstrap_servers="kafka:9092",
+            value_serializer=lambda v: json.dumps(v).encode()
+        )
+    except Exception as e:
+        logger.warning("aiokafka not available; starting without Kafka: %s", e)
+        producer = None
+        return
 
     for attempt in range(10):
         try:
@@ -29,12 +37,12 @@ async def start_producer() -> None:
             logger.warning("Kafka not ready, retrying... (%d/10): %s", attempt + 1, e)
             await asyncio.sleep(5)
 
-    logger.error("Could not connect to Kafka after retries")
-    raise RuntimeError("Could not connect to Kafka")
+    logger.error("Could not connect to Kafka after retries; proceeding without Kafka")
+    producer = None
 
 
 async def stop_producer() -> None:
-    # global producer
+    global producer
     if producer:
         try:
             await cast(Any, producer).stop()
@@ -43,19 +51,24 @@ async def stop_producer() -> None:
             logger.exception("Error while stopping Kafka producer")
 
 
-async def publish_event(topic: str, payload: dict[str, Any]) -> None:
-    """Publish an event to Kafka without blocking request flow.
+def _schedule_send(topic: str, payload: dict[str, Any]) -> None:
+    async def _send() -> None:
+        try:
+            if producer is None:
+                logger.debug("Producer not available; skipping send to %s", topic)
+                return
+            await cast(Any, producer).send_and_wait(topic, payload)
+            logger.debug("Published event to topic %s: %s", topic, payload)
+        except Exception:
+            logger.exception("Failed to publish event to topic %s", topic)
 
-    This enqueues the message in the producer buffer and returns immediately.
-    """
-    # global producer
+    asyncio.create_task(_send())
+
+
+async def publish_event(topic: str, payload: dict[str, Any]) -> None:
+    """Non-blocking publish: schedule send in background and return quickly."""
     if producer is None:
-        logger.error("Attempted to publish event but producer is not started")
+        logger.debug("Producer not available; dropping event to %s", topic)
         return
 
-    try:
-        # Fire-and-forget: schedule the send but don't await network round-trip
-        cast(Any, producer).send(topic, payload)
-        logger.debug("Published event to topic %s: %s", topic, payload)
-    except Exception:
-        logger.exception("Failed to publish event to topic %s", topic)
+    _schedule_send(topic, payload)

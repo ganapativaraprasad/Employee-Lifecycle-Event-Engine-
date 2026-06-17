@@ -37,6 +37,7 @@ from app.services.notification_service import (
 from app.core.enums.employee_state import (
     EmployeeState
 )
+from app.core.cache import invalidate
 
 class EmployeeService:
 
@@ -129,5 +130,17 @@ class EmployeeService:
                 )
             }
         )
+
+        # Invalidate dashboard cache so stats reflect this transition
+        try:
+            await invalidate("dashboard:stats")
+        except Exception:
+            # don't let cache invalidation break the transition
+            pass
+        # Invalidate employee detail cache
+        try:
+            await invalidate(f"employee:{str(employee.id)}")
+        except Exception:
+            pass
 
         return employee

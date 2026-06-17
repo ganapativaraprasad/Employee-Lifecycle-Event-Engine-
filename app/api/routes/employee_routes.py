@@ -47,6 +47,12 @@ from app.services.notification_service import (
     send_status_change_email,
     send_welcome_email
 )
+from app.core.cache import (
+    get_cached,
+    set_cached,
+    invalidate_pattern,
+    invalidate,
+)
 
 router = APIRouter(
     prefix="/employees",
@@ -68,6 +74,11 @@ async def create_employee(
     employee = await EmployeeService.create_employee(
         employee_data
     )
+
+    # Invalidate employee list caches
+    await invalidate_pattern("employees:*")
+    # Invalidate detail cache for this employee (if any)
+    await invalidate(f"employee:{str(employee.id)}")
 
     return {
         "message": "Employee created successfully",
@@ -157,6 +168,21 @@ async def get_all_employees(
             "$options": "i"
         }
 
+    # Cache key built from query parameters
+    key = "employees:" + ":".join([
+        str(page),
+        str(limit),
+        str(search),
+        str(department),
+        str(designation),
+        str(current_state)
+    ])
+
+    # Check Redis cache before querying MongoDB
+    cached = await get_cached(key)
+    if cached:
+        return EmployeeListResponseSchema(**cached)
+
     query = Employee.find(filters)
 
     if search or name:
@@ -233,13 +259,17 @@ async def get_all_employees(
             )
         )
 
-    return EmployeeListResponseSchema(
+    result = EmployeeListResponseSchema(
         items=response,
         total=total,
         page=page,
         limit=limit
     )
 
+    # Store result in cache for short TTL (ensure JSON-serializable)
+    await set_cached(key, result, ttl=60)
+
+    return result
 
 
 @router.get("/{employee_id}")
@@ -253,6 +283,12 @@ async def get_employee_by_id(
     )
 ) -> EmployeeResponseSchema:
 
+    # Try cache first
+    key = f"employee:{employee_id}"
+    cached = await get_cached(key)
+    if cached:
+        return EmployeeResponseSchema(**cached)
+
     employee = await Employee.get(employee_id)
 
     if not employee or employee.is_deleted:
@@ -261,7 +297,7 @@ async def get_employee_by_id(
             detail="Employee not found"
         )
 
-    return EmployeeResponseSchema(
+    result = EmployeeResponseSchema(
         id=str(employee.id),
         employee_code=employee.employee_code,
         first_name=employee.first_name,
@@ -272,6 +308,11 @@ async def get_employee_by_id(
         current_state=employee.current_state,
         created_at=employee.created_at
     )
+
+    # Cache detail
+    await set_cached(key, result, ttl=120)
+
+    return result
 
 
 @router.put("/{employee_id}")
@@ -303,6 +344,11 @@ async def update_employee(
 
     await employee.save()
 
+    # Invalidate employee list caches
+    await invalidate_pattern("employees:*")
+    # Invalidate employee detail cache
+    await invalidate(f"employee:{str(employee.id)}")
+
     return {
         "message": "Employee updated successfully"
     }
@@ -328,153 +374,11 @@ async def delete_employee(
 
     await employee.save()
 
-    return {
-        "message": "Employee soft deleted successfully"
-    }
-
-
-@router.post("/{employee_id}/transition")
-async def transition_employee(
-
-    background_tasks: BackgroundTasks,
-
-    employee_id: str,
-    transition_data: TransitionSchema,
-
-    current_user: User = Depends(
-        require_roles([
-            UserRole.ADMIN,
-            UserRole.HR_MANAGER
-        ])
-    )
-) -> dict[str, str]:
-
-    employee = await EmployeeService.transition_employee(
-        employee_id=employee_id,
-        transition_data=transition_data,
-        actor_id=str(current_user.id)
-    )
-
-    if transition_data.new_state == "ACTIVE":
-
-        background_tasks.add_task(
-
-            send_welcome_email,
-
-            employee.email,
-
-            employee.first_name
-        )
+    # Invalidate employee list caches
+    await invalidate_pattern("employees:*")
+    # Invalidate employee detail cache
+    await invalidate(f"employee:{str(employee.id)}")
 
     return {
-        "message": "Employee transitioned successfully",
-        "new_state": employee.current_state
+        "message": "Employee deleted successfully"
     }
-
-
-@router.post("/{employee_id}/upload")
-async def upload_employee_document(
-    employee_id: str,
-    file: UploadFile = File(...),
-    current_user: User = Depends(
-        require_roles([
-            UserRole.ADMIN,
-            UserRole.HR_MANAGER
-        ])
-    )
-) -> dict[str, str]:
-
-    employee = await Employee.get(employee_id)
-
-    if not employee:
-        raise HTTPException(
-            status_code=404,
-            detail="Employee not found"
-        )
-
-    allowed_extensions = [
-        ".pdf",
-        ".docx",
-        ".png",
-        ".jpg",
-        ".jpeg"
-    ]
-
-    if file.filename is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Filename is missing"
-        )
-
-    file_extension = os.path.splitext(
-        file.filename
-    )[1].lower()
-
-    if file_extension not in allowed_extensions:
-
-        raise HTTPException(
-            status_code=400,
-            detail="Invalid file type"
-        )
-
-    file_size = 0
-
-    contents = await file.read()
-
-    file_size = len(contents)
-
-    max_size = 5 * 1024 * 1024
-
-    if file_size > max_size:
-
-        raise HTTPException(
-            status_code=400,
-            detail="File size exceeds 5MB limit"
-        )
-
-    upload_dir = "uploads"
-
-    os.makedirs(
-        upload_dir,
-        exist_ok=True
-    )
-
-    file_path = f"{upload_dir}/{file.filename}"
-
-    with open(file_path, "wb") as buffer:
-        buffer.write(contents)
-
-    employee.documents.append(file_path)
-
-    await employee.save()
-
-    return {
-        "message": "File uploaded successfully",
-        "file_path": file_path
-    }
-
-@router.get("/download/{file_name}")
-async def download_employee_document(
-    file_name: str,
-    current_user: User = Depends(
-        require_roles([
-            UserRole.ADMIN,
-            UserRole.HR_MANAGER
-        ])
-    )
-) -> FileResponse:
-
-    file_path = f"uploads/{file_name}"
-
-    if not os.path.exists(file_path):
-
-        raise HTTPException(
-            status_code=404,
-            detail="File not found"
-        )
-
-    return FileResponse(
-        path=file_path,
-        filename=file_name,
-        media_type="application/octet-stream"
-    )

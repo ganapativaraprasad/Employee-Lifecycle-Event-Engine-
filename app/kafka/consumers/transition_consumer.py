@@ -21,6 +21,8 @@ _task: Optional[asyncio.Task[Any]] = None
 async def _consume() -> None:
     global _consumer
     try:
+        from aiokafka import AIOKafkaConsumer  # runtime import
+
         _consumer = AIOKafkaConsumer(
             "employee.state.transitions",
             bootstrap_servers="kafka:9092",

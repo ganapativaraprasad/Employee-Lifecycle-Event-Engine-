@@ -7,6 +7,7 @@ from app.models.audit_log_model import AuditLog
 from app.models.employee_model import Employee
 from app.models.user_model import User
 from typing import Any
+from app.core.cache import get_cached, set_cached
 
 router = APIRouter(
     prefix="/dashboard",
@@ -24,6 +25,12 @@ async def get_dashboard_stats(
         ])
     )
 ) -> dict[str, Any]:
+
+    # Cache key
+    key = "dashboard:stats"
+    cached = await get_cached(key)
+    if cached:
+        return cached
 
     total_employees = await Employee.find(
         Employee.is_deleted == False
@@ -66,7 +73,7 @@ async def get_dashboard_stats(
         "-created_at"
     ).limit(8).to_list()
 
-    return {
+    result = {
         "total_employees": total_employees,
         "active_employees": active_employees,
         "onboarding_employees": onboarding_employees,
@@ -88,8 +95,17 @@ async def get_dashboard_stats(
                 "old_state": log.old_state,
                 "new_state": log.new_state,
                 "reason": log.reason,
-                "created_at": log.created_at
+                "created_at": (
+                    log.created_at.isoformat()
+                    if log.created_at
+                    else None
+                )
             }
             for log in recent_activities
         ]
     }
+
+    # cache briefly
+    await set_cached(key, result, ttl=30)
+
+    return result

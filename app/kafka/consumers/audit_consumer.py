@@ -7,6 +7,7 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 from app.models.audit_log_model import AuditLog
 from app.core.enums.audit_action import AuditAction
+from app.core.cache import invalidate
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,8 @@ _task: Optional[asyncio.Task[Any]] = None
 async def _consume() -> None:
     global _consumer
     try:
+        from aiokafka import AIOKafkaConsumer  # runtime import
+
         _consumer = AIOKafkaConsumer(
             "employee.audit.events",
             bootstrap_servers="kafka:9092",
@@ -51,6 +54,12 @@ async def _consume() -> None:
                 )
 
                 await audit_log.insert()
+
+                # Invalidate activity cache so clients see fresh audit events
+                try:
+                    await invalidate("activity")
+                except Exception:
+                    logger.exception("Failed to invalidate activity cache")
 
             except Exception:
                 logger.exception("Failed to process audit message")

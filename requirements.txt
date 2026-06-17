@@ -47,6 +47,7 @@ pytest-cov==7.1.0
 python-dotenv==1.2.2
 python-jose==3.5.0
 python-multipart==0.0.29
+redis==8.0.0
 rsa==4.9.1
 six==1.17.0
 SQLAlchemy==2.0.49

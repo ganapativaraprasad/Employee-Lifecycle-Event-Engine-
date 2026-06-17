@@ -4,6 +4,8 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     mongodb_url: str = ""
     database_name: str = ""
+    redis_url: str = ""
+
     jwt_secret_key: str = ""
 
     smtp_email: str = ""

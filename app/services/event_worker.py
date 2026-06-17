@@ -8,6 +8,8 @@ from app.websocket.manager import manager
 
 from app.models.audit_log_model import AuditLog
 
+from app.core.cache import invalidate
+
 from app.core.enums.audit_action import AuditAction
 
 import logging
@@ -55,6 +57,10 @@ async def process_events() -> None:
                 )
 
                 await audit_log.insert()
+                try:
+                    await invalidate("activity")
+                except Exception:
+                    logger.exception("Failed to invalidate activity cache")
 
         except Exception as e:
 
