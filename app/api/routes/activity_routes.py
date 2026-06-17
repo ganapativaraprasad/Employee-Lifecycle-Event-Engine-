@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from typing import Any
+from typing import Any, Dict, cast
 from app.models.audit_log_model import AuditLog
 from app.models.user_model import User
 from app.core.dependencies import require_roles
@@ -25,8 +25,8 @@ async def get_activity(
 
     key = "activity"
     cached = await get_cached(key)
-    if cached:
-        return cached
+    if cached is not None:
+        return cast(Dict[str, Any], cached)
 
     activities = await AuditLog.find().sort("-created_at").limit(50).to_list()
 

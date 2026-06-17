@@ -74,7 +74,9 @@ async def invalidate_pattern(pattern: str) -> None:
     while True:
         cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=100)
         if keys:
-            keys_to_delete.extend(keys)
+            # redis-py's return type can be `List[bytes] | List[str]` depending
+            # on `decode_responses`. Cast to `List[str]` to satisfy mypy.
+            keys_to_delete.extend(cast(List[str], keys))
         if cursor == 0:
             break
 

@@ -6,7 +6,7 @@ from app.core.enums.user_role import UserRole
 from app.models.audit_log_model import AuditLog
 from app.models.employee_model import Employee
 from app.models.user_model import User
-from typing import Any
+from typing import Any, Dict, cast
 from app.core.cache import get_cached, set_cached
 
 router = APIRouter(
@@ -29,8 +29,8 @@ async def get_dashboard_stats(
     # Cache key
     key = "dashboard:stats"
     cached = await get_cached(key)
-    if cached:
-        return cached
+    if cached is not None:
+        return cast(Dict[str, Any], cached)
 
     total_employees = await Employee.find(
         Employee.is_deleted == False

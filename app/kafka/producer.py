@@ -1,12 +1,17 @@
 import json
 import asyncio
 import logging
-from typing import Optional, Any, cast
+from typing import Optional, Any, cast, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
-# Producer may be an aiokafka AIOKafkaProducer instance when available
-producer: Optional[Any] = None
+# At type-check time import the aiokafka type to satisfy type checkers
+if TYPE_CHECKING:  # pragma: no cover - only for static analysis
+    from aiokafka import AIOKafkaProducer  # type: ignore
+
+# Producer may be an aiokafka AIOKafkaProducer instance when available.
+# Use a forward-ref string to avoid importing aiokafka at runtime.
+producer: Optional["AIOKafkaProducer"] = None
 
 
 async def start_producer() -> None:
