@@ -84,5 +84,5 @@ async def invalidate_pattern(pattern: str) -> None:
     # delete in chunks
     chunk_size = 100
     for i in range(0, len(keys_to_delete), chunk_size):
-        chunk = keys_to_delete[i:i+chunk_size]
+        chunk = keys_to_delete[i:i + chunk_size]
         await redis_client.delete(*chunk)

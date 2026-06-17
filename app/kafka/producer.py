@@ -42,7 +42,7 @@ async def start_producer() -> None:
 
 
 async def stop_producer() -> None:
-    global producer
+    # global producer
     if producer:
         try:
             await cast(Any, producer).stop()
