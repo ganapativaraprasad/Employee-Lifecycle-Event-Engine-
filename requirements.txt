@@ -59,3 +59,4 @@ types-python-jose==3.5.0.20260408
 typing-inspection==0.4.2
 typing_extensions==4.15.0
 uvicorn==0.47.0
+locust==2.19.0
