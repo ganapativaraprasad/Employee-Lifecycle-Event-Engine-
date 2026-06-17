@@ -41,8 +41,21 @@ from fastapi import WebSocket
 from app.websocket.manager import manager
 import asyncio
 
-from app.services.event_worker import (
-    process_events
+from app.kafka.producer import (
+    start_producer,
+    stop_producer
+)
+from app.kafka.consumers.transition_consumer import (
+    start_consumer as start_transition_consumer,
+    stop_consumer as stop_transition_consumer
+)
+from app.kafka.consumers.audit_consumer import (
+    start_consumer as start_audit_consumer,
+    stop_consumer as stop_audit_consumer
+)
+from app.kafka.consumers.notification_consumer import (
+    start_consumer as start_notification_consumer,
+    stop_consumer as stop_notification_consumer
 )
 
 app = FastAPI()
@@ -90,15 +103,25 @@ async def app_init()-> None:
             CalendarEvent
         ]
     )
-    asyncio.create_task(
-        process_events()
-    )
+    await start_producer()
+    # Start Kafka consumers (each start_consumer creates its own background task)
+    start_transition_consumer()
+    start_audit_consumer()
+    start_notification_consumer()
 
 app.include_router(
     employee_router,
     prefix="/api/v1"
 )
 
+@app.on_event("shutdown")
+async def shutdown():
+
+    # Stop consumers first, then producer
+    await stop_transition_consumer()
+    await stop_audit_consumer()
+    await stop_notification_consumer()
+    await stop_producer()
 
 
 @app.get("/")

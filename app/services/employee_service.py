@@ -25,7 +25,7 @@ from app.exceptions.custom_exceptions import (
     EmployeeNotFoundException,
     InvalidTransitionException
 )
-from app.queue.event_queue import (
+from app.kafka.producer import (
     publish_event
 )
 
@@ -33,10 +33,6 @@ from app.websocket.manager import manager
 
 from app.services.notification_service import (
     send_status_change_email
-)
-from app.core.metrics import (
-    employee_state_transitions_total,
-    active_employees_gauge
 )
 from app.core.enums.employee_state import (
     EmployeeState
@@ -86,36 +82,52 @@ class EmployeeService:
         employee.current_state = new_state
 
         await employee.save()
-        active_count = await Employee.find(
-            Employee.current_state == EmployeeState.ACTIVE
-        ).count()
+        # Metrics updates have been moved to Kafka consumers. The API
+        # publishes transition events and returns immediately.
 
-        print(f"ACTIVE COUNT = {active_count}")
-
-        active_employees_gauge.set(active_count)
-
-        print("GAUGE UPDATED")
-
-        employee_state_transitions_total.labels(
-            from_state=current_state,
-            to_state=new_state,
-            role="HR"
-        ).inc()
-
-        print("COUNTER UPDATED")
+        from datetime import datetime
+        timestamp = datetime.utcnow().isoformat()
 
         await publish_event(
-            event_name="EMPLOYEE_STATE_CHANGED",
-            payload={
+            "employee.state.transitions",
+            {
                 "employee_id": str(employee.id),
-                "employee_email": employee.email,
-                "employee_name": employee.first_name,
-                "employee_code": employee.employee_code,
+                "from_state": current_state,
+                "to_state": new_state,
+                "role": "HR",
+                "timestamp": timestamp,
+                "triggered_by": actor_id
+            }
+        )
+
+        await publish_event(
+            "employee.audit.events",
+            {
+                "event_type": "EMPLOYEE_STATE_CHANGED",
+                "employee_id": str(employee.id),
                 "actor_id": actor_id,
-                "old_state": current_state,
-                "new_state": new_state,
-                "reason": transition_data.reason,
-            },
+                "timestamp": timestamp,
+                "metadata": {
+                    "old_state": current_state,
+                    "new_state": new_state,
+                    "reason": transition_data.reason
+                }
+            }
+        )
+
+        await publish_event(
+            "employee.notifications",
+            {
+                "employee_id": str(employee.id),
+                "email": employee.email,
+                "notification_type": "STATE_CHANGE",
+                "from_state": current_state,
+                "to_state": new_state,
+                "message": (
+                    f"Employee state changed "
+                    f"from {current_state} to {new_state}"
+                )
+            }
         )
 
         return employee
