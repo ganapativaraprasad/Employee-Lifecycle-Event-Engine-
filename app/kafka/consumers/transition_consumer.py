@@ -79,7 +79,7 @@ def start_consumer() -> asyncio.Task[Any]:
 
 async def stop_consumer() -> None:
     # cancel and await the background task if running
-    global _task
+    # global _task
     if _task:
         _task.cancel()
         try:
