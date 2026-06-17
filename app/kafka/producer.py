@@ -1,12 +1,14 @@
-from aiokafka import AIOKafkaProducer
 import json
 import asyncio
 import logging
-from typing import Optional
+from typing import Optional, TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from aiokafka import AIOKafkaProducer
 
 logger = logging.getLogger(__name__)
 
-producer: Optional[AIOKafkaProducer] = None
+producer: Optional["AIOKafkaProducer"] = None
 
 
 async def start_producer() -> None:
@@ -20,7 +22,7 @@ async def start_producer() -> None:
 
     for attempt in range(10):
         try:
-            await producer.start()
+            await cast(Any, producer).start()
             logger.info("Kafka producer started")
             return
         except Exception as e:
@@ -35,13 +37,13 @@ async def stop_producer() -> None:
     # global producer
     if producer:
         try:
-            await producer.stop()
+            await cast(Any, producer).stop()
             logger.info("Kafka producer stopped")
         except Exception:
             logger.exception("Error while stopping Kafka producer")
 
 
-async def publish_event(topic: str, payload: dict) -> None:
+async def publish_event(topic: str, payload: dict[str, Any]) -> None:
     """Publish an event to Kafka without blocking request flow.
 
     This enqueues the message in the producer buffer and returns immediately.
@@ -53,7 +55,7 @@ async def publish_event(topic: str, payload: dict) -> None:
 
     try:
         # Fire-and-forget: schedule the send but don't await network round-trip
-        producer.send(topic, payload)
+        cast(Any, producer).send(topic, payload)
         logger.debug("Published event to topic %s: %s", topic, payload)
     except Exception:
         logger.exception("Failed to publish event to topic %s", topic)

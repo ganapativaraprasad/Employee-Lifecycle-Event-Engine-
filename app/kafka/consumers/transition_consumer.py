@@ -1,8 +1,10 @@
 import asyncio
 import json
 import logging
-from typing import Optional
-from aiokafka import AIOKafkaConsumer
+from typing import Optional, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from aiokafka import AIOKafkaConsumer
 from app.core.metrics import (
     employee_state_transitions_total,
     active_employees_gauge
@@ -12,8 +14,8 @@ from app.core.enums.employee_state import EmployeeState
 
 logger = logging.getLogger(__name__)
 
-_consumer: Optional[AIOKafkaConsumer] = None
-_task: Optional[asyncio.Task] = None
+_consumer: Optional["AIOKafkaConsumer"] = None
+_task: Optional[asyncio.Task[Any]] = None
 
 
 async def _consume() -> None:
@@ -68,14 +70,16 @@ async def _consume() -> None:
             logger.info("Transition consumer stopped")
 
 
-def start_consumer() -> asyncio.Task:
-    # global _task
+def start_consumer() -> asyncio.Task[Any]:
+    # start the consumer background task and return the Task object
+    global _task
     _task = asyncio.create_task(_consume())
     return _task
 
 
 async def stop_consumer() -> None:
-    # global _task
+    # cancel and await the background task if running
+    global _task
     if _task:
         _task.cancel()
         try:

@@ -1,15 +1,17 @@
 import asyncio
 import json
 import logging
-from typing import Optional
-from aiokafka import AIOKafkaConsumer
+from typing import Optional, TYPE_CHECKING, Any
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from aiokafka import AIOKafkaConsumer
 from app.models.audit_log_model import AuditLog
 from app.core.enums.audit_action import AuditAction
 
 logger = logging.getLogger(__name__)
 
-_consumer: Optional[AIOKafkaConsumer] = None
-_task: Optional[asyncio.Task] = None
+_consumer: Optional["AIOKafkaConsumer"] = None
+_task: Optional[asyncio.Task[Any]] = None
 
 
 async def _consume() -> None:
@@ -64,14 +66,14 @@ async def _consume() -> None:
             logger.info("Audit consumer stopped")
 
 
-def start_consumer() -> asyncio.Task:
-    # global _task
+def start_consumer() -> asyncio.Task[Any]:
+    global _task
     _task = asyncio.create_task(_consume())
     return _task
 
 
 async def stop_consumer() -> None:
-    # global _task
+    global _task
     if _task:
         _task.cancel()
         try:
