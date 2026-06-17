@@ -33,7 +33,7 @@ async def _consume() -> None:
                 event_type = payload.get("event_type")
                 employee_id = payload.get("employee_id")
                 actor_id = payload.get("actor_id")
-                timestamp = payload.get("timestamp")
+                # timestamp = payload.get("timestamp")
                 metadata = payload.get("metadata", {})
 
                 # Map event types to AuditAction where applicable
@@ -65,14 +65,13 @@ async def _consume() -> None:
 
 
 def start_consumer() -> asyncio.Task:
-    global _task
-    loop = asyncio.get_event_loop()
-    _task = loop.create_task(_consume())
+    # global _task
+    _task = asyncio.create_task(_consume())
     return _task
 
 
 async def stop_consumer() -> None:
-    global _task
+    # global _task
     if _task:
         _task.cancel()
         try:

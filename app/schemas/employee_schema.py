@@ -4,6 +4,7 @@ from pydantic import BaseModel, EmailStr
 
 from app.core.enums.employee_state import EmployeeState
 
+from typing import Optional
 
 class EmployeeCreateSchema(BaseModel):
     employee_code: str
@@ -29,7 +30,6 @@ class EmployeeResponseSchema(BaseModel):
     class Config:
         from_attributes = True
 
-from typing import Optional
 
 class EmployeeUpdateSchema(BaseModel):
     first_name: Optional[str] = None

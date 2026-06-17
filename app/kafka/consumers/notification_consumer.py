@@ -80,14 +80,13 @@ async def _consume() -> None:
 
 
 def start_consumer() -> asyncio.Task:
-    global _task
-    loop = asyncio.get_event_loop()
-    _task = loop.create_task(_consume())
+    # global _task
+    _task = asyncio.create_task(_consume())
     return _task
 
 
 async def stop_consumer() -> None:
-    global _task
+    # global _task
     if _task:
         _task.cancel()
         try:

@@ -32,7 +32,7 @@ async def start_producer() -> None:
 
 
 async def stop_producer() -> None:
-    global producer
+    # global producer
     if producer:
         try:
             await producer.stop()
@@ -46,7 +46,7 @@ async def publish_event(topic: str, payload: dict) -> None:
 
     This enqueues the message in the producer buffer and returns immediately.
     """
-    global producer
+    # global producer
     if producer is None:
         logger.error("Attempted to publish event but producer is not started")
         return
