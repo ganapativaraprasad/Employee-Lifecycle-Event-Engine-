@@ -4,7 +4,7 @@ import logging
 from typing import Optional, TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from aiokafka import AIOKafkaConsumer
+    from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 from app.core.metrics import (
     employee_state_transitions_total,
     active_employees_gauge

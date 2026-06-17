@@ -115,7 +115,7 @@ app.include_router(
 )
 
 @app.on_event("shutdown")
-async def shutdown():
+async def shutdown()-> None:
 
     # Stop consumers first, then producer
     await stop_transition_consumer()

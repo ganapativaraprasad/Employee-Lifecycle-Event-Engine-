@@ -4,7 +4,7 @@ import logging
 from typing import Optional, TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
-    from aiokafka import AIOKafkaProducer
+    from aiokafka import AIOKafkaProducer  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
