@@ -14,7 +14,7 @@ HRMS_USERNAME = os.getenv("HRMS_USERNAME")
 HRMS_PASSWORD = os.getenv("HRMS_PASSWORD")
 
 # Request name used for employee list so the monitoring hook can match it
-EMPLOYEES_LIST_NAME = "GET /api/v1/employees"
+EMPLOYEES_LIST_NAME = "GET /api/v1/employees/"
 
 # p95 threshold in milliseconds
 EMPLOYEES_P95_THRESHOLD_MS = int(os.getenv("EMPLOYEES_P95_THRESHOLD_MS", "300"))
@@ -85,7 +85,7 @@ class HRMSUser(HttpUser):
         # Query first page to collect ids
         try:
             resp = self.client.get(
-                "/api/v1/employees",
+                "/api/v1/employees/",
                 headers=self.auth_headers,
                 name=EMPLOYEES_LIST_NAME,
             )
@@ -96,7 +96,11 @@ class HRMSUser(HttpUser):
             # attempt to re-auth if 401/403
             if resp.status_code in (401, 403) and self.ensure_auth(resp):
                 try:
-                    resp = self.client.get("/api/v1/employees", headers=self.auth_headers, name=EMPLOYEES_LIST_NAME)
+                    resp = self.client.get(
+                        "/api/v1/employees/",
+                        headers=self.auth_headers,
+                        name=EMPLOYEES_LIST_NAME,
+                    )
                 except Exception:
                     return
                 if resp.status_code != 200:
@@ -112,6 +116,8 @@ class HRMSUser(HttpUser):
         except Exception:
             # malformed response, ignore
             self.employee_ids = []
+            # malformed response, ignore
+            self.employee_ids = []
 
     @task(1)
     def login_task(self) -> None:
@@ -125,7 +131,7 @@ class HRMSUser(HttpUser):
         try:
             start = time.time()
             with self.client.get(
-                "/api/v1/employees",
+                "/api/v1/employees/",
                 headers=self.auth_headers,
                 catch_response=True,
                 name=EMPLOYEES_LIST_NAME,
@@ -136,7 +142,7 @@ class HRMSUser(HttpUser):
                     if resp.status_code in (401, 403) and self.ensure_auth(resp):
                         # retry once
                         try:
-                            with self.client.get("/api/v1/employees", headers=self.auth_headers, catch_response=True, name=EMPLOYEES_LIST_NAME) as resp2:
+                            with self.client.get("/api/v1/employees/", headers=self.auth_headers, catch_response=True, name=EMPLOYEES_LIST_NAME) as resp2:
                                 if resp2.status_code != 200:
                                     resp2.failure(f"unexpected status after re-auth: {resp2.status_code}")
                                     return

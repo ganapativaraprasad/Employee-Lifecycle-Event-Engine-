@@ -1,15 +1,25 @@
 import json
+import logging
 from typing import Any, List, cast
 
 from redis.asyncio import Redis
+from redis.exceptions import TimeoutError as RedisTimeoutError, ConnectionError as RedisConnectionError
 from fastapi.encoders import jsonable_encoder
 
 from app.core.config import settings
 from app.core import metrics
 
+logger = logging.getLogger(__name__)
+
+# Create Redis client with conservative timeouts so Redis failures are
+# fast and don't block the API. Operations below are individually wrapped
+# to ensure Redis unavailability never crashes the application.
 redis_client = Redis.from_url(
     settings.redis_url,
-    decode_responses=True
+    decode_responses=True,
+    socket_connect_timeout=2,
+    socket_timeout=2,
+    retry_on_timeout=True,
 )
 
 
@@ -29,7 +39,14 @@ async def get_cached(key: str) -> Any:
 
     Updates Prometheus cache hit/miss counters and the hit-rate gauge.
     """
-    data = await redis_client.get(key)
+    try:
+        data = await redis_client.get(key)
+    except (RedisTimeoutError, RedisConnectionError) as exc:
+        logger.warning("Redis GET failed for key=%s: %s", key, exc)
+        return None
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Unexpected Redis error on GET for key=%s: %s", key, exc)
+        return None
 
     if data:
         metrics.cache_hits_total.inc()
@@ -52,15 +69,27 @@ async def set_cached(
 ) -> None:
     # Ensure value is JSON-serializable (ObjectId/datetime/enum handled)
     encoded = jsonable_encoder(value)
-    await redis_client.set(
-        key,
-        json.dumps(encoded, default=str),
-        ex=ttl
-    )
+    try:
+        await redis_client.set(
+            key,
+            json.dumps(encoded, default=str),
+            ex=ttl
+        )
+    except (RedisTimeoutError, RedisConnectionError) as exc:
+        logger.warning("Redis SET skipped for key=%s due to error: %s", key, exc)
+        return
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Unexpected Redis error on SET for key=%s: %s", key, exc)
+        return
 
 
 async def invalidate(key: str) -> None:
-    await redis_client.delete(key)
+    try:
+        await redis_client.delete(key)
+    except (RedisTimeoutError, RedisConnectionError) as exc:
+        logger.warning("Redis DELETE skipped for key=%s due to error: %s", key, exc)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Unexpected Redis error on DELETE for key=%s: %s", key, exc)
 
 
 async def invalidate_pattern(pattern: str) -> None:
@@ -71,14 +100,21 @@ async def invalidate_pattern(pattern: str) -> None:
     """
     cursor = 0
     keys_to_delete: List[str] = []
-    while True:
-        cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=100)
-        if keys:
-            # redis-py's return type can be `List[bytes] | List[str]` depending
-            # on `decode_responses`. Cast to `List[str]` to satisfy mypy.
-            keys_to_delete.extend(cast(List[str], keys))
-        if cursor == 0:
-            break
+    try:
+        while True:
+            cursor, keys = await redis_client.scan(cursor=cursor, match=pattern, count=100)
+            if keys:
+                # redis-py's return type can be `List[bytes] | List[str]` depending
+                # on `decode_responses`. Cast to `List[str]` to satisfy mypy.
+                keys_to_delete.extend(cast(List[str], keys))
+            if cursor == 0:
+                break
+    except (RedisTimeoutError, RedisConnectionError) as exc:
+        logger.warning("Redis SCAN skipped for pattern=%s due to error: %s", pattern, exc)
+        return
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("Unexpected Redis error on SCAN for pattern=%s: %s", pattern, exc)
+        return
 
     if not keys_to_delete:
         return
@@ -87,4 +123,9 @@ async def invalidate_pattern(pattern: str) -> None:
     chunk_size = 100
     for i in range(0, len(keys_to_delete), chunk_size):
         chunk = keys_to_delete[i:i + chunk_size]
-        await redis_client.delete(*chunk)
+        try:
+            await redis_client.delete(*chunk)
+        except (RedisTimeoutError, RedisConnectionError) as exc:
+            logger.warning("Redis batch DELETE skipped for keys starting at index %d due to error: %s", i, exc)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Unexpected Redis error on batch DELETE for keys starting at index %d: %s", i, exc)

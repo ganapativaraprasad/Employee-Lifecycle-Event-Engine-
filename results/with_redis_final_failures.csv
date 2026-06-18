@@ -1,0 +1,2 @@
+Method,Name,Error,Occurrences
+PATCH,PATCH /api/v1/employees/{id}/transition,HTTPError('400 Client Error: Bad Request for url: PATCH /api/v1/employees/{id}/transition'),6

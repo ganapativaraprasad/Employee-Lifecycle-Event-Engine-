@@ -382,3 +382,61 @@ async def delete_employee(
     return {
         "message": "Employee deleted successfully"
     }
+
+
+@router.patch("/{employee_id}/transition")
+async def transition_employee_endpoint(
+    employee_id: str,
+    transition: TransitionSchema,
+    current_user: User = Depends(
+        require_roles([
+            UserRole.ADMIN,
+            UserRole.HR_MANAGER
+        ])
+    )
+) -> dict[str, str]:
+
+    try:
+        employee = await EmployeeService.transition_employee(
+            employee_id,
+            transition,
+            actor_id=str(current_user.id)
+        )
+
+    except Exception as e:
+        # map known domain exceptions to HTTP responses
+        from app.exceptions.custom_exceptions import (
+            EmployeeNotFoundException,
+            InvalidTransitionException
+        )
+
+        if isinstance(e, EmployeeNotFoundException):
+            raise HTTPException(status_code=404, detail=str(e))
+        if isinstance(e, InvalidTransitionException):
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # unexpected error
+        raise HTTPException(status_code=500, detail="Failed to apply transition")
+
+    # Invalidate employee list caches so UI sees updated state
+    try:
+        await invalidate_pattern("employees:*")
+    except Exception:
+        pass
+
+    # employee detail and dashboard invalidation are handled in service but keep best-effort here
+    try:
+        await invalidate(f"employee:{str(employee.id)}")
+    except Exception:
+        pass
+
+    try:
+        await invalidate("dashboard:stats")
+    except Exception:
+        pass
+
+    return {
+        "message": "Transition applied",
+        "employee_id": str(employee.id),
+        "new_state": str(employee.current_state)
+    }
