@@ -1,7 +1,5 @@
 from pathlib import Path
-
 from pact import Verifier
-
 
 PACT_FILE = (
     Path(__file__).resolve().parent.parent
@@ -9,7 +7,6 @@ PACT_FILE = (
     / "pacts"
     / "EmployeeLifecycleFrontend-EmployeeLifecycleAPI.json"
 )
-
 
 def test_provider_contract():
     verifier = Verifier()
