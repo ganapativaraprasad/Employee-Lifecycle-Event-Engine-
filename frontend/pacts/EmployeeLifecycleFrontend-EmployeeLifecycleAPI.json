@@ -1,0 +1,565 @@
+{
+  "consumer": {
+    "name": "EmployeeLifecycleFrontend"
+  },
+  "interactions": [
+    {
+      "description": "a login request",
+      "providerStates": [
+        {
+          "name": "Valid user exists"
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "path": "/api/v1/auth/login"
+      },
+      "response": {
+        "body": {
+          "access_token": "some string",
+          "refresh_token": "some string",
+          "token_type": "bearer",
+          "user": {
+            "email": "some string",
+            "id": "some string",
+            "role": "some string",
+            "username": "some string"
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.access_token": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.refresh_token": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.token_type": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.user.email": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.user.id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.user.role": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.user.username": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request for dashboard stats",
+      "providerStates": [
+        {
+          "name": "Dashboard statistics exist"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/dashboard/stats"
+      },
+      "response": {
+        "body": {
+          "active_employees": 101,
+          "department_distribution": [
+            {
+              "count": 101,
+              "department": "some string"
+            }
+          ],
+          "offboarded_employees": 101,
+          "on_leave_employees": 101,
+          "onboarding_employees": 101,
+          "recent_activities": [
+            {
+              "action": "some string",
+              "actor_id": "some string",
+              "created_at": "some string",
+              "employee_id": "some string",
+              "new_state": "some string",
+              "old_state": "some string",
+              "reason": "some string"
+            }
+          ],
+          "suspended_employees": 101,
+          "total_employees": 101
+        },
+        "generators": {
+          "body": {
+            "$.active_employees": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.department_distribution[*].count": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.offboarded_employees": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.on_leave_employees": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.onboarding_employees": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.suspended_employees": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.total_employees": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.active_employees": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.department_distribution": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.department_distribution[*].count": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.department_distribution[*].department": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.offboarded_employees": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.on_leave_employees": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.onboarding_employees": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.recent_activities": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.recent_activities[*].action": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recent_activities[*].actor_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recent_activities[*].created_at": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recent_activities[*].employee_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recent_activities[*].new_state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recent_activities[*].old_state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.recent_activities[*].reason": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.suspended_employees": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.total_employees": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request for employees",
+      "providerStates": [
+        {
+          "name": "Employees exist"
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "path": "/api/v1/employees",
+        "query": {
+          "limit": [
+            "5"
+          ],
+          "page": [
+            "1"
+          ]
+        }
+      },
+      "response": {
+        "body": {
+          "items": [
+            {
+              "created_at": "some string",
+              "current_state": "some string",
+              "department": "some string",
+              "designation": "some string",
+              "email": "some string",
+              "employee_code": "some string",
+              "first_name": "some string",
+              "id": "some string",
+              "last_name": "some string"
+            }
+          ],
+          "limit": 101,
+          "page": 101,
+          "total": 101
+        },
+        "generators": {
+          "body": {
+            "$.limit": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.page": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            },
+            "$.total": {
+              "max": 10,
+              "min": 0,
+              "type": "RandomInt"
+            }
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.items": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type",
+                  "min": 1
+                }
+              ]
+            },
+            "$.items[*].created_at": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].current_state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].department": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].designation": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].email": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].employee_code": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].first_name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.items[*].last_name": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.limit": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.page": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            },
+            "$.total": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "integer"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a valid employee transition request",
+      "providerStates": [
+        {
+          "name": "Employee exists"
+        }
+      ],
+      "request": {
+        "body": {
+          "new_state": "ACTIVE",
+          "reason": "Contract Test"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "PATCH",
+        "path": "/api/v1/employees/123/transition"
+      },
+      "response": {
+        "body": {
+          "employee_id": "some string",
+          "message": "some string",
+          "new_state": "some string"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "matchingRules": {
+          "body": {
+            "$.employee_id": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.message": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            },
+            "$.new_state": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "type"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "16.5.0"
+    },
+    "pactRust": {
+      "ffi": "0.5.4",
+      "models": "1.3.11"
+    },
+    "pactSpecification": {
+      "version": "3.0.0"
+    }
+  },
+  "provider": {
+    "name": "EmployeeLifecycleAPI"
+  }
+}
